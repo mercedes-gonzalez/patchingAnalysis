@@ -30,11 +30,10 @@ plt.rcParams.update({'font.size':10 })
 
 
 # gather a list of abf files to analyze
-abf_filepath = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/2023-06-05/"
-
+abf_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/'
+save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/'
 # reads all abf files in the abf_filepath and returns csvs for each file with passive params, firing params, and spike params
-# pABF.readABFs(abf_filepath)
+# pABF.readABFs(abf_path,save_path)
 
 # reads the csvs generated above and creates figures
-pABF.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/")
-
+pABF.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/")

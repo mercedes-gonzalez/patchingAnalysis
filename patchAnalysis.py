@@ -30,7 +30,10 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
     n_sweeps = d.numSweeps
     n_params = 5 + 1 # for fn
     all_data = np.empty((n_sweeps, n_params))
-
+    try:
+        voltage_data = getResponseDataSweep(d,0)
+    except:
+        return
     # for each sweep in the abf, find the passive properties and save to the array 
     for sweep in range(d.numSweeps): 
         voltage_data = getResponseDataSweep(d,sweep)
@@ -111,7 +114,7 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
             plt.savefig(filename+".png")
             plt.clf()
     
-        all_data[sweep,:] = [int(base_fn), membrane_tau, input_resistance, membrane_capacitance, resting, fit_err]
+        all_data[sweep,:] = [int(base_fn),membrane_tau, input_resistance, membrane_capacitance, resting, fit_err]
     return all_data 
 
 def running_mean(x, N):                                                     #running mean to avoid measuring noise
@@ -324,7 +327,12 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
     fn = int(fn)
     # d is a data object (custom defined class called data)
     dt = 1/d.sampleRate
-    del_com = np.diff(getCommandSweep(d,0))
+
+    try: 
+        del_com = np.diff(getCommandSweep(d,0))
+    except:
+        return
+    
     starts = np.where(del_com<0)
     ends = np.where(del_com>0)
     stim_start = starts[0][1] # indices
@@ -339,19 +347,21 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
     # print("stimlength:", stim_length)
     all_avgs = np.empty((d.numSweeps,4))
 
+    # make logical mask to determine current injection sweep
+    command = getCommandSweep(d,0)
+    baseline_cmd = np.array(command[0:10]).mean() #get baseline command (no input)
+    is_on = command < baseline_cmd # Create logical mask for when command input is on
+
     for sweep in range(d.numSweeps):
         current = getResponseDataSweep(d,sweep)
         command = getCommandSweep(d,sweep)
-
         AP_count = 0
         AP_list = []
 
         # GET COMMAND
         baseline_cmd = np.array(command[0:10]).mean() #get baseline command (no input)
-        is_on = command > baseline_cmd # Create logical mask for when command input is on
         input_dur = np.sum(is_on) # number of samples collected with input ON
         input_cmd = np.array(command[is_on]).mean() # get average of input command
-
         # GET NUMBER OF ACTION POTENTIALS
         baseline_data = np.array(current[0:10]).mean() # get baseline data
         peaks, prop = sig.find_peaks(current,prominence=10,height=.5*((max(current)-min(current))/2+min(current)))
@@ -474,7 +484,7 @@ def spike_scaling():
     #return freq_list, curr_list
 '''
 
-def calc_all_spike_params(d,filename,save_path):
+def calc_all_spike_params(d,filename,save_path,ssh):
     full_path = join(save_path,filename)
     if exists(full_path+'.csv'):
         os.remove(full_path+'.csv')
@@ -482,6 +492,9 @@ def calc_all_spike_params(d,filename,save_path):
     f=open(full_path+'.csv','a')
 
     f.write("filename" + "," +
+        "strain" + "," +
+        "sex" + "," +
+        "hemisphere" + "," +
         "sweep" + "," +
         "pA/pF" + "," +
         "current inj" + "," +
@@ -494,15 +507,19 @@ def calc_all_spike_params(d,filename,save_path):
         )
     # d is a data object (custom defined class called data)
     dt = 1/d.sampleRate
-    del_com = np.diff(getCommandSweep(d,0))
+
+    try:
+        del_com = np.diff(getCommandSweep(d,0))
+    except:
+        return
     starts = np.where(del_com<0)
     ends = np.where(del_com>0)
     stim_start = starts[0][1]
     stim_end = ends[0][1]
 
     for sweep in range(d.numSweeps):
-        current = getResponseDataSweep(d,sweep)
-        command = getCommandSweep(d,sweep)
+        response = getResponseDataSweep(d,sweep) # mV
+        command = getCommandSweep(d,sweep) # pA
 
         # stim_start = stim_start - 1
         stim_length = stim_end - stim_start
@@ -513,13 +530,13 @@ def calc_all_spike_params(d,filename,save_path):
         ap_counter = 0
 
         for i in range(int(stim_length)):
-            if current[stim_start + i] > -20 and flag_counter > (0.002 / dt):
+            if response[stim_start + i] > -20 and flag_counter > (0.002 / dt):
                 st1 = int(stim_start + i)                               #calc peak
                 st2 = int(stim_start + i + (0.002 / dt))
-                peak = np.max(current[st1 : st2])
-                peakat = np.argmax(current[st1 : st2]) + st1           
+                peak = np.max(response[st1 : st2])
+                peakat = np.argmax(response[st1 : st2]) + st1           
 
-                dvdt = np.gradient(current, dt * 1000)                 #calculate dvdt_max
+                dvdt = np.gradient(response, dt * 1000)                 #calculate dvdt_max
                 st1 = int(stim_start + i - (0.002 / dt))
                 st2 = int(stim_start + i + (0.002 / dt))
                 dvdt_max1 = np.max(dvdt[st1 : st2])
@@ -527,19 +544,19 @@ def calc_all_spike_params(d,filename,save_path):
                 st1 = int(stim_start + i)                               #calculate threshold
                 for k in range(int(0.002 / dt)):
                     if dvdt[st1 - k] < 50:
-                        thresh = current[st1 - k]
+                        thresh = response[st1 - k]
                         threshat = st1 - k
                         break
 
                 st1 = int(stim_start + i) 
                 st2 = int(stim_start + i + (0.006 / dt))                #calc AHP
-                AHP1 = abs(np.min(current[st1 : st2]) - thresh)
+                AHP1 = abs(np.min(response[st1 : st2]) - thresh)
                 
                 half1 = (peakat - threshat) / 2 + threshat
                 st1 = peakat
                 st2 = peakat + int(0.002 / dt)
                 for i in range(st1,st2):
-                    if current[i] < current[int(half1)]:
+                    if response[i] < response[int(half1)]:
                         half2 = i
                         break
                 hwdt = (half2 - half1) * dt *1000 
@@ -548,6 +565,9 @@ def calc_all_spike_params(d,filename,save_path):
                 papf = 2*sweep - 2
 
                 f.write(filename + "," +
+                        ssh[0] + "," +
+                        ssh[1] + "," +
+                        ssh[2] + "," +
                         str(sweep + 1) + "," +
                         str(papf) + "," +
                         str(currentinj) + "," +

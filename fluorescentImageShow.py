@@ -84,22 +84,11 @@ if 0: # for compositing
     plt.savefig(join(root_path,'4x-composite.png'),bbox_inches='tight')
     plt.show()
 
-# ############## MINI ANIMATION
-# from time import time
-# import pyabf
-# import matplotlib.pyplot as plt
-# import time
-# import imageio
-# from os import listdir
-# from os.path import isfile, join
-# import numpy as np
-# import patchAnalysis as pa
-# import scipy.signal as sig
 
-# '''
-#     This script will take an abf file and print all the inputs/output as a loop of matplotlib plots. must screen record to capture. 
+'''
+    This script will take an abf file and print all the inputs/output as a loop of matplotlib plots. must screen record to capture. 
 
-# '''
+'''
 class data:
     def __init__(self,time,current,command,sampleRate,numSweeps):
         self.time = time
@@ -125,71 +114,30 @@ def getCommandSweep(d,sweepNum):
     return d.command[sweepNum,:]
 
 
-abf = pyabf.ABF("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/2023-06-05/23605011.abf")
+# abf = pyabf.ABF("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/2023-06-06/23606002.abf")
 
-myData = abf2class(abf)
-
-commandWrite = myData.time.reshape((len(myData.time),1))
-currentWrite = myData.time.reshape((len(myData.time),1))
-
-# remove 60 hz lololol
-# fs = myData.sampleRate  # Sample frequency (Hz)
-# f0 = 60    # Frequency to be removed from signal (Hz)
-# Q = 3  # Quality factor
-# # Design notch filter
-# b_notch, a_notch = signal.iirnotch(f0, Q, fs)
-
-
-fig, ax = plt.subplots(nrows=2, sharex=True,gridspec_kw={'height_ratios': [3, 1]})
-fig.set_size_inches(6,5)
-
-print(myData.numSweeps)
-for i in range(myData.numSweeps):
-    ax[0].set_ylim([-100,100])
-    ax[1].set_ylim([-100,2000])
-    ax[1].set_xlabel("Time (s)")
-    ax[0].set_ylabel("Membrane Potential (mV)")
-    ax[1].set_ylabel("Current Injection (pA)")
-    current = getCurrentSweep(myData,i)
-    command = getCommandSweep(myData,i)
-
-    # filteredcurrent = signal.filtfilt(b_notch, a_notch, current)
-    ax[0].plot(myData.time,current,color='firebrick',linewidth=1)
-    ax[1].plot(myData.time,command,color='royalblue',linewidth=1)
-
-    plt.pause(.25)
-
-    ax[0].cla()
-    ax[1].cla()
-plt.show()
-
-
-# from numpy.fft import fft, ifft
-
-# abf = pyabf.ABF("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/2023-06-05/23605011.abf")
 # myData = abf2class(abf)
-# x = getCurrentSweep(myData,1)
-# t = myData.time
 
-# sr = myData.sampleRate
-# X = fft(x)
-# N = len(X)
-# n = np.arange(N)
-# T = N/sr
-# freq = n/T 
+# commandWrite = myData.time.reshape((len(myData.time),1))
+# currentWrite = myData.time.reshape((len(myData.time),1))
 
-# plt.figure(figsize = (12, 6))
-# plt.subplot(121)
+# fig, ax = plt.subplots(nrows=2, sharex=True,gridspec_kw={'height_ratios': [3, 1]})
+# fig.set_size_inches(6,5)
 
-# plt.stem(freq, np.abs(X), 'b', \
-#          markerfmt=" ", basefmt="-b")
-# plt.xlabel('Freq (Hz)')
-# plt.ylabel('FFT Amplitude |X(freq)|')
-# plt.xlim(0, 1000)
+# for i in [10]:
+#     ax[0].set_ylim([-100,100])
+#     ax[1].set_ylim([-100,2000])
+#     ax[1].set_xlabel("Time (s)")
+#     ax[0].set_ylabel("Membrane Potential (mV)")
+#     ax[1].set_ylabel("Current Injection (pA)")
+#     current = getCurrentSweep(myData,i)
+#     command = getCommandSweep(myData,i)
 
-# plt.subplot(122)
-# plt.plot(t, ifft(X), 'r')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Amplitude')
-# plt.tight_layout()
+#     ax[0].plot(myData.time,current,color='firebrick',linewidth=1)
+#     ax[1].plot(myData.time,command,color='royalblue',linewidth=1)
+
+#     plt.pause(.25)
+
+#     ax[0].cla()
+#     ax[1].cla()
 # plt.show()
