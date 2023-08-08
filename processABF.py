@@ -72,7 +72,7 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
     dates_list = [f for f in listdir(abf_path) if isdir(join(abf_path,f))]
 
     for day_num,datestr in enumerate(dates_list):
-        print(datestr)
+        # print(datestr)
         # generate list of abfs from filepath
         abf_list = [f for f in listdir(join(abf_path,datestr)) if isfile(join(abf_path,datestr,f)) and f.endswith(".abf")]
     
@@ -80,7 +80,6 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
         for c,abfstr in enumerate(abf_list):
             # get mouse strain/sex/hemisphere info from info_df
             search_datestr =int(abfstr[:-7])
-            print('\t',abfstr)
             if search_datestr in info_df['date'].values:
                 mouse_info = info_df[info_df['date'] == search_datestr]
                 strain = mouse_info.iloc[0]['strain']
@@ -100,6 +99,7 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
             # Passive parameters 
             img_filename = join(save_path,"fit_pngs",base_fn)
             all_pas_params = pa.calc_pas_params(myData,img_filename,base_fn) # calculates passive properties of the cell
+            membrane_capacitance = all_pas_params[:,3].mean()
             df = pd.DataFrame(all_pas_params,columns = ['filename','membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'fit_err'])
             df.insert(1,"strain",strain)
             df.insert(1,"sex",sex)
@@ -109,12 +109,13 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
             # firing parameters
             all_firing_params = pa.calc_freq(myData,base_fn)
             df = pd.DataFrame(all_firing_params,columns = ['filename','sweep', 'current_inj', 'mean_firing_frequency'])
-            df.insert(1,"pA/pF",2*df['sweep']-2)
+            df.insert(1,"membrane_capacitance",membrane_capacitance)
+            df.insert(1,"est_pA/pF",2*df['sweep']-2) #estimated
+            df.insert(1,"pA/pF",df['current_inj']/df['membrane_capacitance']) #actually calculated
             df.insert(1,"strain",strain)
             df.insert(1,"sex",sex)
             df.insert(1,"hemisphere",hemisphere)
             df.to_csv(join(firing_path,base_fn+'-firing_params.csv'),index=False)
-            print(join(firing_path,base_fn+'-firing_params.csv'))
             # individual spike params 
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,ssh)
 
@@ -145,51 +146,82 @@ def makePatchStatsFigs(csv_path):
             }
         return PROPS
     if 1: # run this to plot current vs firing freq
-
         alldata = pd.read_csv(join(csv_path,'compiled_firing_freq.csv'))
-        selectdata = alldata.loc[(alldata['pA/pF'] <= 30) & (alldata['pA/pF'] > 0)]
-        # selectdata = selectdata0.loc[(selectdata0['hemisphere'] == 'L')]
+        print('alldata: ',len(alldata))
+        # Function to remove outliers using the Z-score method for each group
+        def remove_outliers(group):
+            threshold = 3  # Z-score threshold, you can adjust this based on your data
+            mean_firing_freq = np.mean(group['mean_firing_frequency'])
+            std_firing_freq = np.std(group['mean_firing_frequency'])
+            return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
 
-        # metric = "mean_firing_frequency"
-        # PROPS = setProps('black')
-        # ax = sns.boxplot(x='pA/pF',y=metric,data=selectdata,**PROPS)
-        # ax.set(xlabel="Current Injection (pA/pF)",ylabel="Mean Firing Frequency (Hz)")
-        
+        # Removing outliers from the 'pA/pF' column for each current injection group
+        cleaned_df = alldata.groupby('est_pA/pF').apply(remove_outliers).reset_index(drop=True)
+        print('cleaned: ',len(cleaned_df))
+        # Print the DataFrame containing outliers
+        outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
+        print("Outliers:")
+        print(len(outliers_df))
+
+        xaxisstr = 'pA/pF'
+        selectdata = cleaned_df.loc[(cleaned_df['pA/pF'] <= 30) & (cleaned_df['pA/pF'] >= 0)]
+        hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPP')]
+        B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6J')]
+                                 
+        mean_firing_freq = hAPPdata.groupby(xaxisstr)['mean_firing_frequency'].mean()
+        sem_firing_freq = hAPPdata.groupby(xaxisstr)['mean_firing_frequency'].sem()
+        current_injection_values_hAPP = mean_firing_freq.index.tolist()
+        mean_values_hAPP = mean_firing_freq.values.tolist()
+        sem_values_hAPP = sem_firing_freq.values.tolist()
+
+        mean_firing_freq = B6Jdata.groupby(xaxisstr)['mean_firing_frequency'].mean()
+        sem_firing_freq = B6Jdata.groupby(xaxisstr)['mean_firing_frequency'].sem()
+        current_injection_values_B6J = mean_firing_freq.index.tolist()
+        mean_values_B6J = mean_firing_freq.values.tolist()
+        sem_values_B6J = sem_firing_freq.values.tolist()
+
         fig, axs = plt.subplots()
-        fig.set_size_inches(7,4)
+        fig.set_size_inches(4,4)
         
-        sns.boxplot(data=selectdata, x="pA/pF", y="mean_firing_frequency", hue="strain",linewidth=1,
-               palette={"B6J": "b", "hAPP": ".85"})
-        sns.stripplot(data=selectdata, x="pA/pF", y="mean_firing_frequency", hue="strain",
-               palette={"B6J": "b", "hAPP": ".85"})
-
-        axs.set(ylabel="Firing Frequency (Hz)",xlabel="Current Injection (pA/pF)")
-        sns.despine(left=True)
-
-        # female_data = selectdata[selectdata["mouse"]=="B6J"]
-        # male_data = selectdata[selectdata["mouse"]=="hAPP"]
-
-        # PROPS = setProps('slateblue')
-        # ax = sns.boxplot(x='pA/pF',y="mean_firing_frequency",data=female_data,**PROPS)
-
-        # PROPS = setProps('black')
-        # ax = sns.boxplot(x='pA/pF',y="mean_firing_frequency",data=male_data,**PROPS)
-
+        # Plotting the error bar plot
+        lw = 2
+        ms = 7
+        plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
+        plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
+        plt.xlabel('Current Injection (pA/pF)')
+        plt.ylabel('Mean Firing Frequency (Hz)')
+        plt.legend(['hAPP','B6J'])
         plt.tight_layout()
-        plt.show()
+        # plt.show()
 
-    if 0: # plot a boxplot for a passive param
-        alldata = pd.read_csv(join(csv_path,'both_compiled_pas_params.csv'))
+    if 1: # plot a boxplot for a passive param
+        alldata = pd.read_csv(join(csv_path,'compiled_pas_params.csv'))
+        alldata = alldata.loc[(alldata['fit_err'] <= .5) & (alldata['membrane_tau'] > 0) & (alldata['membrane_tau'] < 85)]
+        
+        # Function to remove outliers using the Z-score method for each group
+        def remove_outliers(group,metric):
+            threshold = 3  # Z-score threshold, you can adjust this based on your data
+            mean_firing_freq = np.mean(group[metric])
+            std_firing_freq = np.std(group[metric])
+            return group[abs(group[metric] - mean_firing_freq) < threshold * std_firing_freq]
+
+        metrics = ['membrane_tau','membrane_capacitance','input_resistance','RMP']
+
+        for metric in metrics:
+            # Removing outliers from the 'pA/pF' column for each current injection group
+            cleaned_df = alldata.groupby('strain').apply(lambda x: remove_outliers(x, metric)).reset_index(drop=True)
+        print("OUTLIERS: ",len(alldata)-len(cleaned_df))
+
         avg_params = []
         # average the params
-        list_fn = pd.unique(alldata['filename'])
+        list_fn = pd.unique(cleaned_df['filename'])
 
         for num,fn in enumerate(list_fn):
-            print('fn',fn)
-            fn_df = alldata.loc[alldata['filename'] == fn]
-            print(fn_df)
-            mouse = fn_df.iat[0,1]
-            print('mouse=',mouse)
+            fn_df = cleaned_df.loc[cleaned_df['filename'] == fn]
+            strain = fn_df.iat[0,3]
+            sex = fn_df.iat[0,2]
+            hemisphere = fn_df.iat[0,1]
+
             tau_list = np.array(pd.unique(fn_df['membrane_tau']))
             tau = np.average(tau_list)
 
@@ -202,26 +234,34 @@ def makePatchStatsFigs(csv_path):
             rmp_list = np.array(pd.unique(fn_df['RMP']))
             rmp = np.average(rmp_list)
 
-            avg_params.append([fn,mouse,tau,capacitance,input_resistance,rmp])
+            avg_params.append([fn,strain,sex,hemisphere,tau,capacitance,input_resistance,rmp])
         
-        avgdata = pd.DataFrame(avg_params, columns =['filename','mouse', 'membrane_tau','membrane_capacitance','input_resistance','RMP'])
-
+        avgdata = pd.DataFrame(avg_params, columns =['filename','strain','sex','hemisphere','membrane_tau','membrane_capacitance','input_resistance','RMP'])
 
         PROPS = setProps('black')
-        fig, axs = plt.subplots(ncols=4)
-        fig.set_size_inches(9,3)
+        fig2, axs2 = plt.subplots(ncols=4)
+        fig2.set_size_inches(9,3)
         w = .2
-        sns.boxplot(y="RMP",x="mouse",data=avgdata,**PROPS,width=w,ax=axs[0])
-        axs[0].set(ylabel="resting membrane potential (mV)",xlabel="Strain")
-        sns.boxplot(y="membrane_tau",x="mouse",data=avgdata,**PROPS,width=w,ax=axs[1])
-        axs[1].set(ylabel="tau (ms)",xlabel="Strain")
-        sns.boxplot(y="input_resistance",x="mouse",data=avgdata,**PROPS,width=w,ax=axs[2])
-        axs[2].set(ylabel="membrane resistance (M$\Omega$)",xlabel="Strain")
-        sns.boxplot(y="membrane_capacitance",x="mouse",data=avgdata,**PROPS,width=w,ax=axs[3])
-        axs[3].set(ylabel="membrane capacitance (pF)",xlabel="Strain")
+        palstr = ['orangered','royalblue']
+        sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0])
+        sns.swarmplot(y="RMP",x="strain",data=avgdata,zorder=.5,ax=axs2[0],palette=palstr)
+        axs2[0].set(ylabel="resting membrane potential (mV)",xlabel="")
+
+        sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1])
+        sns.swarmplot(y="membrane_tau",x="strain",data=avgdata,zorder=.5,ax=axs2[1],palette=palstr)
+        axs2[1].set(ylabel="tau (ms)",xlabel="")
+
+        sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2])
+        sns.swarmplot(y="input_resistance",x="strain",data=avgdata,zorder=.5,ax=axs2[2],palette=palstr)
+        axs2[2].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
+
+        sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3])
+        sns.swarmplot(y="membrane_capacitance",x="strain",data=avgdata,zorder=.5,ax=axs2[3],palette=palstr)
+        axs2[3].set(ylabel="membrane capacitance (pF)",xlabel="")
 
         plt.tight_layout()
         plt.show()
+        
 
     if 0: # run this to plot summary stats on ap firing
         alldata = pd.read_csv(join(csv_path,'june5and6_compiled_spike_params.csv'))

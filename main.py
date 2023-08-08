@@ -36,4 +36,4 @@ save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/'
 # pABF.readABFs(abf_path,save_path)
 
 # reads the csvs generated above and creates figures
-pABF.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/")
+pABF.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs")
