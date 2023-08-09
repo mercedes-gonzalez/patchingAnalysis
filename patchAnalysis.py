@@ -71,6 +71,7 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
             sampleRate = int(1 / dt / 1000)+1
             membrane_tau =  ((1 / t) / sampleRate) * 1e6 / 20
             membrane_capacitance = membrane_tau / input_resistance *1000
+
         except:
             m = 0
             t = 0

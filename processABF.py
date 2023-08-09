@@ -156,7 +156,7 @@ def makePatchStatsFigs(csv_path):
             return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
 
         # Removing outliers from the 'pA/pF' column for each current injection group
-        cleaned_df = alldata.groupby('est_pA/pF').apply(remove_outliers).reset_index(drop=True)
+        cleaned_df = alldata.groupby('pA/pF').apply(remove_outliers).reset_index(drop=True)
         print('cleaned: ',len(cleaned_df))
         # Print the DataFrame containing outliers
         outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
@@ -240,75 +240,124 @@ def makePatchStatsFigs(csv_path):
 
         PROPS = setProps('black')
         fig2, axs2 = plt.subplots(ncols=4)
-        fig2.set_size_inches(9,3)
+        fig2.set_size_inches(10,3)
         w = .2
         palstr = ['orangered','royalblue']
-        sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0])
-        sns.swarmplot(y="RMP",x="strain",data=avgdata,zorder=.5,ax=axs2[0],palette=palstr)
-        axs2[0].set(ylabel="resting membrane potential (mV)",xlabel="")
+        sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3])
+        sns.swarmplot(y="RMP",x="strain",data=avgdata,zorder=.5,ax=axs2[3],palette=palstr)
+        axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
 
-        sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1])
-        sns.swarmplot(y="membrane_tau",x="strain",data=avgdata,zorder=.5,ax=axs2[1],palette=palstr)
-        axs2[1].set(ylabel="tau (ms)",xlabel="")
+        sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2])
+        sns.swarmplot(y="membrane_tau",x="strain",data=avgdata,zorder=.5,ax=axs2[2],palette=palstr)
+        axs2[2].set(ylabel="tau (ms)",xlabel="")
 
-        sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2])
-        sns.swarmplot(y="input_resistance",x="strain",data=avgdata,zorder=.5,ax=axs2[2],palette=palstr)
-        axs2[2].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
+        sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0])
+        sns.swarmplot(y="input_resistance",x="strain",data=avgdata,zorder=.5,ax=axs2[0],palette=palstr)
+        axs2[0].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
 
-        sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3])
-        sns.swarmplot(y="membrane_capacitance",x="strain",data=avgdata,zorder=.5,ax=axs2[3],palette=palstr)
-        axs2[3].set(ylabel="membrane capacitance (pF)",xlabel="")
+        sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1])
+        sns.swarmplot(y="membrane_capacitance",x="strain",data=avgdata,zorder=.5,ax=axs2[1],palette=palstr)
+        axs2[1].set(ylabel="membrane capacitance (pF)",xlabel="")
 
         plt.tight_layout()
-        plt.show()
         
-
-    if 0: # run this to plot summary stats on ap firing
-        alldata = pd.read_csv(join(csv_path,'june5and6_compiled_spike_params.csv'))
-
-        APnums0 = alldata[alldata['APnum']<21]
-        APnums = APnums0[APnums0['APnum'] > 0]
-        inj1 = APnums[APnums['pA/pF'] == 16]
-        inj2 = APnums[APnums['pA/pF'] == 20]
-        inj3 = APnums[APnums['pA/pF'] == 30]
-
-        metric = "AP peak"
-        PROPS = setProps('black')
-        ax = sns.boxplot(x='APnum',y=metric,data=inj1,**PROPS)
-        # ax.set_ylim([0,50])
-
-        PROPS = setProps('skyblue')
-        ax = sns.boxplot(x='APnum',y=metric,data=inj2,**PROPS)
-
-        PROPS = setProps('slateblue')
-        ax = sns.boxplot(x='APnum',y=metric,data=inj3,**PROPS)
-
-        # plt.legend(labels=['10','12','16'])
-        # ax = sns.swarmplot(x='APnum',y='AP peak',data=inj1,color='gray')
-
-        plt.tight_layout()
-        plt.show()
-
-    if 0:
+    if 1: # plot a boxplot for a spike params
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params.csv'))
-        APnumselect = alldata[alldata['APnum'].isin([1,10,20])]
-        selectcurrent = APnumselect[APnumselect['pA/pF']==6]
+        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 3)] # only first AP
+        
+        # Function to remove outliers using the Z-score method for each group
+        def remove_outliers(group,metric):
+            threshold = 3  # Z-score threshold, you can adjust this based on your data
+            mean_firing_freq = np.mean(group[metric])
+            std_firing_freq = np.std(group[metric])
+            return group[abs(group[metric] - mean_firing_freq) < threshold * std_firing_freq]
 
-        fig = plt.figure(figsize=(4,3))
-        PROPS = {
-        'boxprops':{'facecolor':'none', 'edgecolor':'black'},
-        'medianprops':{'color':'black'},
-        'whiskerprops':{'color':'black'},
-        'capprops':{'color':'black'},
-        'width':{.4}
-        }
+        metrics = ['AHP','threshold','dV/dt max','AP peak']
 
-        metric = 'dV/dt max'
-        ax = sns.boxplot(x='APnum',y=metric,hue = 'Sex',data=selectcurrent,
-                         palette={"m": "b", "f": ".85"})
-        ax.set(ylabel="dV/dt max",xlabel="AP Num")
-        plt.legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+        for metric in metrics:
+            # Removing outliers from the 'pA/pF' column for each current injection group
+            cleaned_df = alldata.groupby('strain').apply(lambda x: remove_outliers(x, metric)).reset_index(drop=True)
+        print("OUTLIERS: ",len(alldata)-len(cleaned_df))
 
-        # ax = sns.swarmplot(x='APnum',y=metric,data=selectcurrent,color='gray')
+        PROPS = setProps('black')
+        fig2, axs2 = plt.subplots(ncols=4)#,nrows=2)
+        fig2.set_size_inches(10,3)
+        w = .2
+        palstr = ['orangered','royalblue']
+        sns.boxplot(y="AP peak",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[0])
+        sns.swarmplot(y="AP peak",x="strain",data=cleaned_df,zorder=.5,ax=axs2[0],palette=palstr)
+        axs2[0].set(ylabel="AP peak (mV)",xlabel="")
+
+        sns.boxplot(y="AP hwdt",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[1])
+        sns.swarmplot(y="AP hwdt",x="strain",data=cleaned_df,zorder=.5,ax=axs2[1],palette=palstr)
+        axs2[1].set(ylabel="AP hwdt (mV)",xlabel="")
+
+        # sns.boxplot(y="AHP",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[2])
+        # sns.swarmplot(y="AHP",x="strain",data=cleaned_df,zorder=.5,ax=axs2[2],palette=palstr)
+        # axs2[2].set(ylabel="AHP",xlabel="")
+
+        sns.boxplot(y="threshold",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[3])
+        sns.swarmplot(y="threshold",x="strain",data=cleaned_df,zorder=.5,ax=axs2[3],palette=palstr)
+        axs2[3].set(ylabel="threshold (pF)",xlabel="")
+
+        sns.boxplot(y="dV/dt max",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[2])
+        sns.swarmplot(y="dV/dt max",x="strain",data=cleaned_df,zorder=.5,ax=axs2[2],palette=palstr)
+        axs2[2].set(ylabel="dV/dt max (mV/s)",xlabel="")
+
         plt.tight_layout()
-        plt.show()
+
+    # if 1: # run this to plot summary stats on ap firing
+    #     alldata = pd.read_csv(join(csv_path,'compiled_spike_params.csv'))
+
+    #     # Function to remove outliers using the Z-score method for each group
+    #     def remove_outliers(group):
+    #         threshold = 3  # Z-score threshold, you can adjust this based on your data
+    #         mean_firing_freq = np.mean(group['mean_firing_frequency'])
+    #         std_firing_freq = np.std(group['mean_firing_frequency'])
+    #         return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
+
+    #     # Removing outliers from the 'pA/pF' column for each current injection group
+    #     cleaned_df = alldata.groupby('pA/pF').apply(remove_outliers).reset_index(drop=True)
+    #     print('cleaned: ',len(cleaned_df))
+    #     # Print the DataFrame containing outliers
+    #     outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
+    #     print("Outliers:")
+    #     print(len(outliers_df))
+
+    #     xaxisstr = 'pA/pF'
+    #     selectdata = cleaned_df.loc[(cleaned_df['pA/pF'] <= 30) & (cleaned_df['pA/pF'] >= 0)]
+    #     hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPP')]
+    #     B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6J')]
+                                 
+    #     mean_firing_freq = hAPPdata.groupby(xaxisstr)['mean_firing_frequency'].mean()
+    #     sem_firing_freq = hAPPdata.groupby(xaxisstr)['mean_firing_frequency'].sem()
+    #     current_injection_values_hAPP = mean_firing_freq.index.tolist()
+    #     mean_values_hAPP = mean_firing_freq.values.tolist()
+    #     sem_values_hAPP = sem_firing_freq.values.tolist()
+
+    #     mean_firing_freq = B6Jdata.groupby(xaxisstr)['mean_firing_frequency'].mean()
+    #     sem_firing_freq = B6Jdata.groupby(xaxisstr)['mean_firing_frequency'].sem()
+    #     current_injection_values_B6J = mean_firing_freq.index.tolist()
+    #     mean_values_B6J = mean_firing_freq.values.tolist()
+    #     sem_values_B6J = sem_firing_freq.values.tolist()
+
+
+    #     APnums0 = alldata[alldata['APnum']<21]
+    #     APnums = APnums0[APnums0['APnum'] > 0]
+    #     inj1 = APnums[APnums['pA/pF'] == 16]
+    #     inj2 = APnums[APnums['pA/pF'] == 20]
+    #     inj3 = APnums[APnums['pA/pF'] == 30]
+
+    #     metric = "AP peak"
+    #     PROPS = setProps('black')
+    #     ax = sns.boxplot(x='APnum',y=metric,data=inj1,**PROPS)
+    #     # ax.set_ylim([0,50])
+
+    #     PROPS = setProps('skyblue')
+    #     ax = sns.boxplot(x='APnum',y=metric,data=inj2,**PROPS)
+
+    #     PROPS = setProps('slateblue')
+    #     ax = sns.boxplot(x='APnum',y=metric,data=inj3,**PROPS)
+
+    #     plt.tight_layout()
+    plt.show()
