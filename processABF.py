@@ -164,7 +164,7 @@ def makePatchStatsFigs(csv_path):
         print(len(outliers_df))
 
         xaxisstr = 'pA/pF'
-        selectdata = cleaned_df.loc[(cleaned_df['pA/pF'] <= 30) & (cleaned_df['pA/pF'] >= 0)]
+        selectdata = cleaned_df.loc[(cleaned_df['pA/pF'] <= 30) & (cleaned_df['pA/pF'] >0)]
         hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPP')]
         B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6J')]
                                  
@@ -237,6 +237,7 @@ def makePatchStatsFigs(csv_path):
             avg_params.append([fn,strain,sex,hemisphere,tau,capacitance,input_resistance,rmp])
         
         avgdata = pd.DataFrame(avg_params, columns =['filename','strain','sex','hemisphere','membrane_tau','membrane_capacitance','input_resistance','RMP'])
+        print("NUM CELLS PLOTTED:",len(avgdata))
 
         PROPS = setProps('black')
         fig2, axs2 = plt.subplots(ncols=4)
@@ -306,7 +307,7 @@ def makePatchStatsFigs(csv_path):
 
         plt.tight_layout()
 
-    # if 1: # run this to plot summary stats on ap firing
+    # if 1: # run this to plot ap peak vs ap num, not yet done 
     #     alldata = pd.read_csv(join(csv_path,'compiled_spike_params.csv'))
 
     #     # Function to remove outliers using the Z-score method for each group

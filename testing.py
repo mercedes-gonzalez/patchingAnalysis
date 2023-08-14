@@ -60,9 +60,9 @@ for a in abf_list:
                 plt.plot(t, x,linewidth=.5)
 
         plt.xlabel('Time (s)')
-        plt.ylabel('membrane potential (mV)')
+        plt.ylabel('current (pA)')
         plt.title(a)
         plt.tight_layout()
 
-        plt.savefig(join(save_path,a+'.png'))
+        # plt.savefig(join(save_path,a+'.png'))
         plt.clf()

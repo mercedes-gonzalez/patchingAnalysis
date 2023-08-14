@@ -63,11 +63,13 @@ if 0: # for gfp
     plt.show()
 
 if 0: # for compositing
-    dic_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-06/dic 4x/Pos0/img_000000000_Default_000.tif'
-    gfp_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-06/gfp 4x/Pos0/img_000000000_Default_000.tif'
+    dic_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/merc images/2023-06-06/dic 4x/Pos0/img_000000000_Default_000.tif'
+    gfp_img = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/merc images/2023-06-06/gfp 4x/Pos0/img_000000000_Default_000.tif"
+    
     # dic_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/dic'+str(n)+'/Pos0/img_000000000_Default_000.tif'
     # gfp_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/gfp'+str(n)+'/Pos0/img_000000000_Default_000.tif'
-    root_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/'
+
+    root_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs"
     BW1 = plt.imread(dic_img)/255
     BW_adj1 = (BW1 - BW1.min())/(BW1.max()-BW1.min())
 
