@@ -43,27 +43,28 @@ def abf2class(abf):
         
     return myData
 
-def lvm2class(commandFile,currentFile,memtest):
+def lvm2class(commandFile,responseFile,memtest=0):
+    # read from the lvms
     commandData = np.genfromtxt(commandFile,delimiter='\t',skip_header=23)
-    currentData = np.genfromtxt(currentFile,delimiter='\t',skip_header=23)
+    responseData = np.genfromtxt(responseFile,delimiter='\t',skip_header=23)
 
     if memtest == 1:
-        myData = data(time=currentData[:,0],current=currentData[:,1],command=commandData[:,1],sampleRate=round(1/(currentData[1,0]-currentData[0,0])))
+        myData = data(time=responseData[:,0],response=responseData[:,1],command=commandData[:,1],sampleRate=round(1/(responseData[1,0]-responseData[0,0])))
 
     elif memtest == 0:
-        [r,nSweeps] = currentData.shape
+        [r,nSweeps] = responseData.shape
         for sweepNumber in range(nSweeps):
             if sweepNumber == 0:
-                myData = data(time=currentData[:,0],current=currentData[:,1],command=commandData[:,1],sampleRate=round(1/(currentData[1,0]-currentData[0,0])))
+                myData = data(time=responseData[:,0],response=responseData[:,1],command=commandData[:,1],sampleRate=round(1/(responseData[1,0]-responseData[0,0])))
             else:
-                myData.current = np.vstack((myData.current,currentData[:,sweepNumber]))
+                myData.response = np.vstack((myData.response,responseData[:,sweepNumber]))
                 myData.command = np.vstack((myData.command,commandData[:,sweepNumber]))
                 myData.numSweeps = myData.numSweeps + 1
     return myData
 
 ## Define location of folder with data files. 
 
-def readABFs(abf_path,save_path): # Run this to read the abfs and get the passive params. 
+def readABFs(abf_path,save_path,brainslice=True): # Run this to read the abfs and get the passive params. 
     # define path for the pngs to check the exponential fit
     fit_png_path = join(save_path,"fit_pngs")
     if not isdir(fit_png_path):
@@ -96,18 +97,19 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
     
         # for each abf, get the passive, firing, and spike params
         for c,abfstr in enumerate(abf_list):
-            # get mouse strain/sex/hemisphere info from info_df
-            search_datestr =int(abfstr[:-7])
-            if search_datestr in info_df['date'].values:
-                mouse_info = info_df[info_df['date'] == search_datestr]
-                strain = mouse_info.iloc[0]['strain']
-                hemisphere = mouse_info.iloc[0]['hemisphere']
-                sex = mouse_info.iloc[0]['sex']
-                ssh = [strain,sex,hemisphere]
+            if brainslice:
+                # get mouse strain/sex/hemisphere info from info_df
+                search_datestr =int(abfstr[:-7])
+                if search_datestr in info_df['date'].values:
+                    mouse_info = info_df[info_df['date'] == search_datestr]
+                    strain = mouse_info.iloc[0]['strain']
+                    hemisphere = mouse_info.iloc[0]['hemisphere']
+                    sex = mouse_info.iloc[0]['sex']
+                    ssh = [strain,sex,hemisphere]
 
-            else:
-                print("Did not find ",search_datestr," in info csv.")
-                break
+                else:
+                    print("Did not find ",search_datestr," in info csv.")
+                    break
 
             # get data from abf
             base_fn = abfstr[:-4]
@@ -119,9 +121,10 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
             all_pas_params = pa.calc_pas_params(myData,img_filename,base_fn) # calculates passive properties of the cell
             membrane_capacitance = all_pas_params[:,3].mean()
             df = pd.DataFrame(all_pas_params,columns = ['filename','membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'fit_err'])
-            df.insert(1,"strain",strain)
-            df.insert(1,"sex",sex)
-            df.insert(1,"hemisphere",hemisphere)
+            if brainslice:
+                df.insert(1,"strain",strain)
+                df.insert(1,"sex",sex)
+                df.insert(1,"hemisphere",hemisphere)
             df.to_csv(join(pas_path,base_fn+'-pas_params.csv'),index=False)
             
             # firing parameters
@@ -130,9 +133,10 @@ def readABFs(abf_path,save_path): # Run this to read the abfs and get the passiv
             df.insert(1,"membrane_capacitance",membrane_capacitance)
             df.insert(1,"est_pA/pF",2*df['sweep']-2) #estimated
             df.insert(1,"pA/pF",df['current_inj']/df['membrane_capacitance']) #actually calculated
-            df.insert(1,"strain",strain)
-            df.insert(1,"sex",sex)
-            df.insert(1,"hemisphere",hemisphere)
+            if brainslice: 
+                df.insert(1,"strain",strain)
+                df.insert(1,"sex",sex)
+                df.insert(1,"hemisphere",hemisphere)
             df.to_csv(join(firing_path,base_fn+'-firing_params.csv'),index=False)
             # individual spike params 
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,ssh)
