@@ -43,6 +43,24 @@ def abf2class(abf):
         
     return myData
 
+def lvm2class(commandFile,currentFile,memtest):
+    commandData = np.genfromtxt(commandFile,delimiter='\t',skip_header=23)
+    currentData = np.genfromtxt(currentFile,delimiter='\t',skip_header=23)
+
+    if memtest == 1:
+        myData = data(time=currentData[:,0],current=currentData[:,1],command=commandData[:,1],sampleRate=round(1/(currentData[1,0]-currentData[0,0])))
+
+    elif memtest == 0:
+        [r,nSweeps] = currentData.shape
+        for sweepNumber in range(nSweeps):
+            if sweepNumber == 0:
+                myData = data(time=currentData[:,0],current=currentData[:,1],command=commandData[:,1],sampleRate=round(1/(currentData[1,0]-currentData[0,0])))
+            else:
+                myData.current = np.vstack((myData.current,currentData[:,sweepNumber]))
+                myData.command = np.vstack((myData.command,commandData[:,sweepNumber]))
+                myData.numSweeps = myData.numSweeps + 1
+    return myData
+
 ## Define location of folder with data files. 
 
 def readABFs(abf_path,save_path): # Run this to read the abfs and get the passive params. 
