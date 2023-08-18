@@ -22,6 +22,10 @@ from os import listdir, mkdir
 from os.path import isfile, join, isdir
 import csv
 
+# for statistics
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+
 ## Definitions of classes and functions
 class data:
     def __init__(self,time,response,command,sampleRate):
@@ -168,8 +172,9 @@ def makePatchStatsFigs(csv_path):
             }
         return PROPS
     if 1: # run this to plot current vs firing freq
-        alldata = pd.read_csv(join(csv_path,'compiled_firing_freq.csv'))
+        alldata = pd.read_csv(join(csv_path,'compiled_firing_freq-2.csv'))
         print('alldata: ',len(alldata))
+
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group):
             threshold = 3  # Z-score threshold, you can adjust this based on your data
@@ -178,15 +183,16 @@ def makePatchStatsFigs(csv_path):
             return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
 
         # Removing outliers from the 'pA/pF' column for each current injection group
-        cleaned_df = alldata.groupby('pA/pF').apply(remove_outliers).reset_index(drop=True)
-        print('cleaned: ',len(cleaned_df))
-        # Print the DataFrame containing outliers
-        outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
-        print("Outliers:")
-        print(len(outliers_df))
+        cleaned_df = alldata.groupby('pApF').apply(remove_outliers).reset_index(drop=True)
+        # print('cleaned: ',len(cleaned_df))
 
-        xaxisstr = 'pA/pF'
-        selectdata = cleaned_df.loc[(cleaned_df['pA/pF'] <= 30) & (cleaned_df['pA/pF'] >0)]
+        # Print the DataFrame containing outliers
+        # outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
+        # print("Outliers:")
+        # print(len(outliers_df))
+
+        xaxisstr = 'pApF'
+        selectdata = cleaned_df.loc[(cleaned_df['pApF'] <= 30) & (cleaned_df['pApF'] >0)]
         hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPP')]
         B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6J')]
                                  
@@ -202,12 +208,22 @@ def makePatchStatsFigs(csv_path):
         mean_values_B6J = mean_firing_freq.values.tolist()
         sem_values_B6J = sem_firing_freq.values.tolist()
 
+        # ANOVA statistics 
+        save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/stats/firing_freq/'
+        unique_pApF_values = selectdata['pApF'].unique().tolist()
+        for inj in unique_pApF_values:#get unique pApF and do the stats for each injection...
+            current_inj_df = selectdata.loc[(selectdata['pApF'] == inj)]
+            model = ols('pApF ~ C(strain) + C(sex) + C(strain):C(sex)',data=current_inj_df).fit()
+            result = sm.stats.anova_lm(model,typ=2)
+            result.to_csv(join(save_path,str(inj)+'.csv'), index=True)
+
         fig, axs = plt.subplots()
         fig.set_size_inches(4,4)
         
         # Plotting the error bar plot
         lw = 2
         ms = 7
+        plt.scatter(x='pApF',y='mean_firing_frequency',data=selectdata)
         plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.xlabel('Current Injection (pA/pF)')
@@ -216,8 +232,8 @@ def makePatchStatsFigs(csv_path):
         plt.tight_layout()
         # plt.show()
 
-    if 1: # plot a boxplot for a passive param
-        alldata = pd.read_csv(join(csv_path,'compiled_pas_params.csv'))
+    if 0: # plot a boxplot for a passive param
+        alldata = pd.read_csv(join(csv_path,'compiled_pas_params-2.csv'))
         alldata = alldata.loc[(alldata['fit_err'] <= .5) & (alldata['membrane_tau'] > 0) & (alldata['membrane_tau'] < 85)]
         
         # Function to remove outliers using the Z-score method for each group
@@ -265,27 +281,31 @@ def makePatchStatsFigs(csv_path):
         fig2, axs2 = plt.subplots(ncols=4)
         fig2.set_size_inches(10,3)
         w = .2
+        huestr = "sex"
         palstr = ['orangered','royalblue']
         sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3])
-        sns.swarmplot(y="RMP",x="strain",data=avgdata,zorder=.5,ax=axs2[3],palette=palstr)
+        sns.swarmplot(y="RMP",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[3],palette=palstr)
         axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
 
         sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2])
-        sns.swarmplot(y="membrane_tau",x="strain",data=avgdata,zorder=.5,ax=axs2[2],palette=palstr)
+        sns.swarmplot(y="membrane_tau",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[2],palette=palstr)
         axs2[2].set(ylabel="tau (ms)",xlabel="")
 
         sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0])
-        sns.swarmplot(y="input_resistance",x="strain",data=avgdata,zorder=.5,ax=axs2[0],palette=palstr)
+        sns.swarmplot(y="input_resistance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[0],palette=palstr)
         axs2[0].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
 
         sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1])
-        sns.swarmplot(y="membrane_capacitance",x="strain",data=avgdata,zorder=.5,ax=axs2[1],palette=palstr)
+        sns.swarmplot(y="membrane_capacitance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[1],palette=palstr)
         axs2[1].set(ylabel="membrane capacitance (pF)",xlabel="")
+
+        for i in [0,1,2,3]:
+            axs2[i].get_legend().remove()
 
         plt.tight_layout()
         
-    if 1: # plot a boxplot for a spike params
-        alldata = pd.read_csv(join(csv_path,'compiled_spike_params.csv'))
+    if 0: # plot a boxplot for a spike params
+        alldata = pd.read_csv(join(csv_path,'compiled_spike_params-2.csv'))
         alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 3)] # only first AP
         
         # Function to remove outliers using the Z-score method for each group
@@ -303,16 +323,17 @@ def makePatchStatsFigs(csv_path):
         print("OUTLIERS: ",len(alldata)-len(cleaned_df))
 
         PROPS = setProps('black')
-        fig2, axs2 = plt.subplots(ncols=4)#,nrows=2)
-        fig2.set_size_inches(10,3)
+        fig2, axs2 = plt.subplots(ncols=4+1)#,nrows=2)
+        fig2.set_size_inches(11,3)
         w = .2
+        huestr = "sex"
         palstr = ['orangered','royalblue']
         sns.boxplot(y="AP peak",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[0])
-        sns.swarmplot(y="AP peak",x="strain",data=cleaned_df,zorder=.5,ax=axs2[0],palette=palstr)
+        sns.swarmplot(y="AP peak",x="strain",hue=huestr,data=cleaned_df,zorder=.5,ax=axs2[0],palette=palstr)
         axs2[0].set(ylabel="AP peak (mV)",xlabel="")
 
         sns.boxplot(y="AP hwdt",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[1])
-        sns.swarmplot(y="AP hwdt",x="strain",data=cleaned_df,zorder=.5,ax=axs2[1],palette=palstr)
+        sns.swarmplot(y="AP hwdt",x="strain",hue=huestr,data=cleaned_df,zorder=.5,ax=axs2[1],palette=palstr)
         axs2[1].set(ylabel="AP hwdt (mV)",xlabel="")
 
         # sns.boxplot(y="AHP",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[2])
@@ -320,12 +341,18 @@ def makePatchStatsFigs(csv_path):
         # axs2[2].set(ylabel="AHP",xlabel="")
 
         sns.boxplot(y="threshold",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[3])
-        sns.swarmplot(y="threshold",x="strain",data=cleaned_df,zorder=.5,ax=axs2[3],palette=palstr)
+        sns.swarmplot(y="threshold",x="strain",hue=huestr,data=cleaned_df,zorder=.5,ax=axs2[3],palette=palstr)
         axs2[3].set(ylabel="threshold (pF)",xlabel="")
 
         sns.boxplot(y="dV/dt max",x="strain",data=cleaned_df,**PROPS,width=w,ax=axs2[2])
-        sns.swarmplot(y="dV/dt max",x="strain",data=cleaned_df,zorder=.5,ax=axs2[2],palette=palstr)
+        sns.swarmplot(y="dV/dt max",x="strain",hue=huestr,data=cleaned_df,zorder=.5,ax=axs2[2],palette=palstr)
         axs2[2].set(ylabel="dV/dt max (mV/s)",xlabel="")
+
+        for i in [0,1,2,3]:
+            axs2[i].get_legend().remove()
+            # print(0)
+        handles, labels = axs2[3].get_legend_handles_labels()
+        fig2.legend(handles, labels, loc='upper right',bbox_to_anchor=(1.25,0.5))
 
         plt.tight_layout()
 
