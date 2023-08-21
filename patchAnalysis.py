@@ -63,7 +63,7 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
 
         X1 = d.time[passive_start : int((passive_start + (0.1 / dt)))]           #calculate membrane tau
         Y1 = voltage_data[passive_start : int((passive_start + (0.1 / dt)))]
-
+        print('0.1 + / dt: ', (0.1 / dt))
         p0 = (20, 10, 50)
         try:
             params, cv = scipy.optimize.curve_fit(monoExp, X1[::50], Y1[::50], p0, maxfev = 10000)

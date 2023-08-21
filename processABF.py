@@ -25,6 +25,7 @@ import csv
 # for statistics
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
+from scipy.stats import shapiro
 
 ## Definitions of classes and functions
 class data:
@@ -146,18 +147,18 @@ def readABFs(abf_path,save_path,brainslice=True): # Run this to read the abfs an
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,ssh)
 
     # Read the above generated csvs and compile into 1 csv
-    pas_csv_list = [join(pas_path,f) for f in listdir(pas_path) if isfile(join(pas_path, f)) and f.endswith(".csv")]
-    firing_csv_list = [join(firing_path,f) for f in listdir(firing_path) if isfile(join(firing_path, f)) and f.endswith(".csv")]
-    spike_csv_list = [join(spike_path,f) for f in listdir(spike_path) if isfile(join(spike_path, f)) and f.endswith(".csv")]
+    # pas_csv_list = [join(pas_path,f) for f in listdir(pas_path) if isfile(join(pas_path, f)) and f.endswith(".csv")]
+    # firing_csv_list = [join(firing_path,f) for f in listdir(firing_path) if isfile(join(firing_path, f)) and f.endswith(".csv")]
+    # spike_csv_list = [join(spike_path,f) for f in listdir(spike_path) if isfile(join(spike_path, f)) and f.endswith(".csv")]
 
-    df = pd.concat(map(pd.read_csv,spike_csv_list),ignore_index=True)
-    df.to_csv(join(save_path,'compiled_spike_params.csv'),index=False)
+    # df = pd.concat(map(pd.read_csv,spike_csv_list),ignore_index=True)
+    # df.to_csv(join(save_path,'compiled_spike_params.csv'),index=False)
 
-    df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
-    df.to_csv(join(save_path,'compiled_firing_freq.csv'),index=False)
+    # df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
+    # df.to_csv(join(save_path,'compiled_firing_freq.csv'),index=False)
 
-    df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
-    df.to_csv(join(save_path,'compiled_pas_params.csv'),index=False)
+    # df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
+    # df.to_csv(join(save_path,'compiled_pas_params.csv'),index=False)
 
 def makePatchStatsFigs(csv_path):
     # plot formatting
@@ -177,13 +178,13 @@ def makePatchStatsFigs(csv_path):
 
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group):
-            threshold = 3  # Z-score threshold, you can adjust this based on your data
+            threshold = 2.5  # Z-score threshold, you can adjust this based on your data
             mean_firing_freq = np.mean(group['mean_firing_frequency'])
             std_firing_freq = np.std(group['mean_firing_frequency'])
             return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
 
         # Removing outliers from the 'pA/pF' column for each current injection group
-        cleaned_df = alldata.groupby('pApF').apply(remove_outliers).reset_index(drop=True)
+        cleaned_df = alldata #alldata.groupby('pApF').apply(remove_outliers).reset_index(drop=True)
         # print('cleaned: ',len(cleaned_df))
 
         # Print the DataFrame containing outliers
@@ -208,12 +209,19 @@ def makePatchStatsFigs(csv_path):
         mean_values_B6J = mean_firing_freq.values.tolist()
         sem_values_B6J = sem_firing_freq.values.tolist()
 
+        # Test groups for normality first.
+        grouped = selectdata.groupby(['pApF', 'sex', 'strain'])
+        for group_name, group_data in grouped['mean_firing_frequency']:
+            shapiro_stat, shapiro_p_value = shapiro(group_data)
+            nsamples = len(group_data)
+            print(f"Group: {group_name}, N: {nsamples}, Shapiro-Wilk Statistic: {shapiro_stat:.4f}, p-value: {shapiro_p_value:.4f}")
+
         # ANOVA statistics 
         save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/stats/firing_freq/'
         unique_pApF_values = selectdata['pApF'].unique().tolist()
-        for inj in unique_pApF_values:#get unique pApF and do the stats for each injection...
+        for inj in unique_pApF_values: #get unique pApF and do the stats for each injection value
             current_inj_df = selectdata.loc[(selectdata['pApF'] == inj)]
-            model = ols('pApF ~ C(strain) + C(sex) + C(strain):C(sex)',data=current_inj_df).fit()
+            model = ols('pApF ~ C(strain) + C(sex)',data=current_inj_df).fit()
             result = sm.stats.anova_lm(model,typ=2)
             result.to_csv(join(save_path,str(inj)+'.csv'), index=True)
 
@@ -230,6 +238,28 @@ def makePatchStatsFigs(csv_path):
         plt.ylabel('Mean Firing Frequency (Hz)')
         plt.legend(['hAPP','B6J'])
         plt.tight_layout()
+
+        # normality violin plots
+        fig3, axs3 = plt.subplots(2)
+        fig3.set_size_inches(10,4)
+        maledata = selectdata[selectdata['sex'] == 'M']
+        sns.violinplot(data=maledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[0])
+        sns.violinplot(data=maledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[0])
+        plt.xlabel('Current Injection (pA/pF)')
+        plt.ylabel('Mean Firing Frequency (Hz)')
+
+
+        femaledata = selectdata[selectdata['sex'] == 'F']
+        sns.violinplot(data=femaledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[1])
+        sns.violinplot(data=femaledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[1])
+        plt.xlabel('Current Injection (pA/pF)')
+        plt.ylabel('Mean Firing Frequency (Hz)')
+
+        # plt.legend(['hAPP','B6J'])
+        plt.tight_layout()
+        
+
+
         # plt.show()
 
     if 0: # plot a boxplot for a passive param
