@@ -1,6 +1,10 @@
 '''
 All of the functions and extra code needed for patch analysis script.
-Mercedes Gonzalez. March 2023.
+
+Mercedes Gonzalez. August 2023. 
+mercedesmg.com
+Precision Biosystems Lab | Georgia Institute of Technology
+Version Control: https://github.com/mercedes-gonzalez/patchingAnalysis
 Based on: https://github.com/ViktorJOlah/Firing_pattern_analysis
 '''
 
@@ -63,7 +67,7 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
 
         X1 = d.time[passive_start : int((passive_start + (0.1 / dt)))]           #calculate membrane tau
         Y1 = voltage_data[passive_start : int((passive_start + (0.1 / dt)))]
-        print('0.1 + / dt: ', (0.1 / dt))
+
         p0 = (20, 10, 50)
         try:
             params, cv = scipy.optimize.curve_fit(monoExp, X1[::50], Y1[::50], p0, maxfev = 10000)
@@ -353,6 +357,17 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
     baseline_cmd = np.array(command[0:10]).mean() #get baseline command (no input)
     is_on = command < baseline_cmd # Create logical mask for when command input is on
 
+    num_rows = 4
+    num_cols = 4
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(14, 8))
+    
+    def plot_subplots(ax,row,col,x,y,peakx,peaky,title):
+        ax[row,col].plot(x,y,linewidth=1)
+        ax[row,col].scatter(peakx,peaky,color='r',s=1)
+        ax[row,col].set_title(title)
+
+    positions = np.reshape(np.arange(16),(4,4))
+
     for sweep in range(d.numSweeps):
         current = getResponseDataSweep(d,sweep)
         command = getCommandSweep(d,sweep)
@@ -363,17 +378,25 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         baseline_cmd = np.array(command[0:10]).mean() #get baseline command (no input)
         input_dur = np.sum(is_on) # number of samples collected with input ON
         input_cmd = np.array(command[is_on]).mean() # get average of input command
+        
         # GET NUMBER OF ACTION POTENTIALS
         baseline_data = np.array(current[0:10]).mean() # get baseline data
         peaks, prop = sig.find_peaks(current,prominence=10,height=.5*((max(current)-min(current))/2+min(current)))
-        # plt.hist(prop["prominences"])
-        # plt.show()
-        num_APs = len(peaks)
 
-        # plt.plot(d.time,current)
-        # plt.scatter(d.time[peaks],current[peaks],color='red')
-        # plt.show()
+        num_APs = len(peaks)
+        save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/currentclamp_pngs/"
+        
+
+        # add to the subplots
+        if sweep < 16:
+            ax_idx = np.hstack(np.where(positions == sweep))
+            row = ax_idx[0]
+            col = ax_idx[1]
+            plot_subplots(axes,row,col,d.time,current,d.time[peaks],current[peaks],fn)
+
         # print("NUM APS:",num_APs)
+
+
 
 #       Viktor's version??
 #         for i in range(stim_start, stim_end):
@@ -393,6 +416,8 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         currentinj = command[stim_start+5]
         # max_firing_frequency = max_freq
         all_avgs[sweep,:] = (fn,sweep,currentinj,mean_firing_frequency)
+    
+    plt.savefig(join(save_path,str(fn)+'.png'))
     return all_avgs
 
 ''' calc acc ratio

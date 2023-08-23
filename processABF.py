@@ -3,7 +3,7 @@
     -reads a folder with abf files in it
     -creates a compiled info csv to use for plotting summary stats
 
-    Mercedes Gonzalez. June 2023. 
+    Mercedes Gonzalez. August 2023. 
     mercedesmg.com
     Precision Biosystems Lab | Georgia Institute of Technology
     Version Control: https://github.com/mercedes-gonzalez/patchingAnalysis
@@ -25,7 +25,8 @@ import csv
 # for statistics
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
-from scipy.stats import shapiro
+from scipy.stats import shapiro, ttest_ind
+import statistics 
 
 ## Definitions of classes and functions
 class data:
@@ -124,7 +125,7 @@ def readABFs(abf_path,save_path,brainslice=True): # Run this to read the abfs an
             # Passive parameters 
             img_filename = join(save_path,"fit_pngs",base_fn)
             all_pas_params = pa.calc_pas_params(myData,img_filename,base_fn) # calculates passive properties of the cell
-            membrane_capacitance = all_pas_params[:,3].mean()
+            membrane_capacitance = np.median(all_pas_params[:,3])
             df = pd.DataFrame(all_pas_params,columns = ['filename','membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'fit_err'])
             if brainslice:
                 df.insert(1,"strain",strain)
@@ -137,7 +138,7 @@ def readABFs(abf_path,save_path,brainslice=True): # Run this to read the abfs an
             df = pd.DataFrame(all_firing_params,columns = ['filename','sweep', 'current_inj', 'mean_firing_frequency'])
             df.insert(1,"membrane_capacitance",membrane_capacitance)
             df.insert(1,"est_pA/pF",2*df['sweep']-2) #estimated
-            df.insert(1,"pA/pF",df['current_inj']/df['membrane_capacitance']) #actually calculated
+            df.insert(1,"calculated_pA/pF",df['current_inj']/df['membrane_capacitance']) #actually calculated
             if brainslice: 
                 df.insert(1,"strain",strain)
                 df.insert(1,"sex",sex)
@@ -147,18 +148,19 @@ def readABFs(abf_path,save_path,brainslice=True): # Run this to read the abfs an
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,ssh)
 
     # Read the above generated csvs and compile into 1 csv
-    # pas_csv_list = [join(pas_path,f) for f in listdir(pas_path) if isfile(join(pas_path, f)) and f.endswith(".csv")]
-    # firing_csv_list = [join(firing_path,f) for f in listdir(firing_path) if isfile(join(firing_path, f)) and f.endswith(".csv")]
-    # spike_csv_list = [join(spike_path,f) for f in listdir(spike_path) if isfile(join(spike_path, f)) and f.endswith(".csv")]
+    pas_csv_list = [join(pas_path,f) for f in listdir(pas_path) if isfile(join(pas_path, f)) and f.endswith(".csv")]
+    firing_csv_list = [join(firing_path,f) for f in listdir(firing_path) if isfile(join(firing_path, f)) and f.endswith(".csv")]
+    spike_csv_list = [join(spike_path,f) for f in listdir(spike_path) if isfile(join(spike_path, f)) and f.endswith(".csv")]
 
-    # df = pd.concat(map(pd.read_csv,spike_csv_list),ignore_index=True)
-    # df.to_csv(join(save_path,'compiled_spike_params.csv'),index=False)
+    df = pd.concat(map(pd.read_csv,spike_csv_list),ignore_index=True)
+    df.to_csv(join(save_path,'compiled_spike_params.csv'),index=False)
 
-    # df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
-    # df.to_csv(join(save_path,'compiled_firing_freq.csv'),index=False)
+    df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
+    df.insert(5,"pApF",round(df["calculated_pA/pF"]/2)*2)
+    df.to_csv(join(save_path,'compiled_firing_freq.csv'),index=False)
 
-    # df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
-    # df.to_csv(join(save_path,'compiled_pas_params.csv'),index=False)
+    df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
+    df.to_csv(join(save_path,'compiled_pas_params.csv'),index=False)
 
 def makePatchStatsFigs(csv_path):
     # plot formatting
@@ -178,22 +180,22 @@ def makePatchStatsFigs(csv_path):
 
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group):
-            threshold = 2.5  # Z-score threshold, you can adjust this based on your data
+            threshold = 2 # Z-score threshold, you can adjust this based on your data
             mean_firing_freq = np.mean(group['mean_firing_frequency'])
             std_firing_freq = np.std(group['mean_firing_frequency'])
             return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
 
         # Removing outliers from the 'pA/pF' column for each current injection group
-        cleaned_df = alldata #alldata.groupby('pApF').apply(remove_outliers).reset_index(drop=True)
-        # print('cleaned: ',len(cleaned_df))
+        cleaned_df = alldata.groupby('pApF').apply(remove_outliers).reset_index(drop=True)
+        print('cleaned: ',len(cleaned_df))
 
         # Print the DataFrame containing outliers
-        # outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
-        # print("Outliers:")
-        # print(len(outliers_df))
+        outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
+        print("Outliers:")
+        print(len(outliers_df))
 
         xaxisstr = 'pApF'
-        selectdata = cleaned_df.loc[(cleaned_df['pApF'] <= 30) & (cleaned_df['pApF'] >0)]
+        selectdata = cleaned_df.loc[(cleaned_df['pApF'] <= 30) & (cleaned_df['pApF'] >=0)]
         hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPP')]
         B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6J')]
                                  
@@ -209,66 +211,107 @@ def makePatchStatsFigs(csv_path):
         mean_values_B6J = mean_firing_freq.values.tolist()
         sem_values_B6J = sem_firing_freq.values.tolist()
 
+        # ___________________ between all groups stats _________________________
         # Test groups for normality first.
-        grouped = selectdata.groupby(['pApF', 'sex', 'strain'])
+        stats = []
+        grouped = selectdata.groupby([xaxisstr, 'sex', 'strain'])
         for group_name, group_data in grouped['mean_firing_frequency']:
             shapiro_stat, shapiro_p_value = shapiro(group_data)
             nsamples = len(group_data)
             print(f"Group: {group_name}, N: {nsamples}, Shapiro-Wilk Statistic: {shapiro_stat:.4f}, p-value: {shapiro_p_value:.4f}")
-
-        # ANOVA statistics 
+            stats.append([group_name[0],group_name[1],group_name[2],nsamples,shapiro_stat,shapiro_p_value])
+        
+        with open("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/compiled_firing_stats-2.csv", "w") as f:
+            writer = csv.writer(f)
+            writer.writerow([xaxisstr,'sex','strain','numSamples','SW-stat','p-value'])
+            writer.writerows(stats)
+        
+        # _____________ ANOVA statistics just sex and strain ____________________-
         save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/stats/firing_freq/'
-        unique_pApF_values = selectdata['pApF'].unique().tolist()
+        unique_pApF_values = selectdata[xaxisstr].unique().tolist()
         for inj in unique_pApF_values: #get unique pApF and do the stats for each injection value
-            current_inj_df = selectdata.loc[(selectdata['pApF'] == inj)]
-            model = ols('pApF ~ C(strain) + C(sex)',data=current_inj_df).fit()
+            current_inj_df = selectdata.loc[(selectdata[xaxisstr] == inj)]
+            model = ols('mean_firing_frequency ~ C(strain) + C(sex)',data=current_inj_df).fit()
             result = sm.stats.anova_lm(model,typ=2)
+            print(result)
             result.to_csv(join(save_path,str(inj)+'.csv'), index=True)
 
+        # ___________________ hAPP vs B6 stats _________________________
+        stats = []
+        grouped = selectdata.groupby(['strain','pApF'])
+        for group_name, group_data in grouped['mean_firing_frequency']:
+            shapiro_stat, shapiro_p_value = shapiro(group_data)
+            nsamples = len(group_data)
+            # print(f"Group: {group_name}, N: {nsamples}, Shapiro-Wilk Statistic: {shapiro_stat:.4f}, p-value: {shapiro_p_value:.4f}")
+            stats.append([group_name[0],group_name[1],nsamples,shapiro_stat,shapiro_p_value])
+        
+        with open("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/compiled_firing_stats-B6vshAPP-2.csv", "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(['strain','current_inj','numSamples','SW-stat','p-value'])
+            writer.writerows(stats)
+        # _______________________________________________________________
+
         fig, axs = plt.subplots()
-        fig.set_size_inches(4,4)
+        fig.set_size_inches(4.5,4)
         
         # Plotting the error bar plot
         lw = 2
         ms = 7
-        plt.scatter(x='pApF',y='mean_firing_frequency',data=selectdata)
+        # clrs = ['k','r','b','y','g','c','m','slategray']
+        # for d,date in enumerate(selectdata['date'].unique().tolist()):
+        #     pltdata = selectdata[selectdata['date']==date]
+        #     plt.scatter(x='pApF',y='mean_firing_frequency',marker="o",color=clrs[d],data=pltdata)
+        #     print('color: ',clrs[d],'\tdate: ',date)
+        # plt.legend(selectdata['date'].unique().tolist())
+
         plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.xlabel('Current Injection (pA/pF)')
         plt.ylabel('Mean Firing Frequency (Hz)')
+        plt.ylim([0,250])
+        plt.xlim([0,32])
         plt.legend(['hAPP','B6J'])
         plt.tight_layout()
 
-        # normality violin plots
-        fig3, axs3 = plt.subplots(2)
-        fig3.set_size_inches(10,4)
-        maledata = selectdata[selectdata['sex'] == 'M']
-        sns.violinplot(data=maledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[0])
-        sns.violinplot(data=maledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[0])
-        plt.xlabel('Current Injection (pA/pF)')
-        plt.ylabel('Mean Firing Frequency (Hz)')
+        if 1:
+            # normality violin plots - one plot with B6 vs hAPP
+            fig3, axs3 = plt.subplots(1)
+            fig3.set_size_inches(16,8)
+
+            sns.violinplot(data=selectdata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3).set(title="hAPP vs B6J")
+            plt.tight_layout()
+        if 0:
+            # normality violin plots - two plots, for M and F 
+            fig3, axs3 = plt.subplots(2)
+            fig3.set_size_inches(10,8)
+            maledata = selectdata[selectdata['sex'] == 'M']
+            femaledata = selectdata[selectdata['sex'] == 'F']
+
+            sns.violinplot(data=maledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[0]).set(title="Male")
+            sns.violinplot(data=femaledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[1]).set(title="Female")
+
+            plt.tight_layout()
+        if 0:
+            # normality violin plots - two plots, for hAPP and B6
+            fig3, axs3 = plt.subplots(2)
+            fig3.set_size_inches(10,8)
+            hAPPdata = selectdata[selectdata['strain'] == 'hAPP']
+            B6data = selectdata[selectdata['strain'] == 'B6J']
+
+            sns.violinplot(data=hAPPdata,x='pApF',y='mean_firing_frequency',hue='sex',split=True,ax=axs3[0]).set(title="hAPP")
+            sns.violinplot(data=B6data,x='pApF',y='mean_firing_frequency',hue='sex',split=True,ax=axs3[1]).set(title="B6J")
+
+            plt.tight_layout()
 
 
-        femaledata = selectdata[selectdata['sex'] == 'F']
-        sns.violinplot(data=femaledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[1])
-        sns.violinplot(data=femaledata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3[1])
-        plt.xlabel('Current Injection (pA/pF)')
-        plt.ylabel('Mean Firing Frequency (Hz)')
-
-        # plt.legend(['hAPP','B6J'])
-        plt.tight_layout()
-        
-
-
-        # plt.show()
-
-    if 0: # plot a boxplot for a passive param
+        plt.show()
+    if 1: # plot a boxplot for a passive param
         alldata = pd.read_csv(join(csv_path,'compiled_pas_params-2.csv'))
         alldata = alldata.loc[(alldata['fit_err'] <= .5) & (alldata['membrane_tau'] > 0) & (alldata['membrane_tau'] < 85)]
         
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group,metric):
-            threshold = 3  # Z-score threshold, you can adjust this based on your data
+            threshold = 2.5 # Z-score threshold, you can adjust this based on your data
             mean_firing_freq = np.mean(group[metric])
             std_firing_freq = np.std(group[metric])
             return group[abs(group[metric] - mean_firing_freq) < threshold * std_firing_freq]
@@ -291,16 +334,16 @@ def makePatchStatsFigs(csv_path):
             hemisphere = fn_df.iat[0,1]
 
             tau_list = np.array(pd.unique(fn_df['membrane_tau']))
-            tau = np.average(tau_list)
+            tau = np.median(tau_list)
 
             cap_list = np.array(pd.unique(fn_df['membrane_capacitance']))
-            capacitance = np.average(cap_list)
+            capacitance = np.median(cap_list)
 
             in_rest_list = np.array(pd.unique(fn_df['input_resistance']))
-            input_resistance = np.average(in_rest_list)
+            input_resistance = np.median(in_rest_list)
 
             rmp_list = np.array(pd.unique(fn_df['RMP']))
-            rmp = np.average(rmp_list)
+            rmp = np.median(rmp_list)
 
             avg_params.append([fn,strain,sex,hemisphere,tau,capacitance,input_resistance,rmp])
         
@@ -333,8 +376,38 @@ def makePatchStatsFigs(csv_path):
             axs2[i].get_legend().remove()
 
         plt.tight_layout()
+
+        # ________ Test for normality _________ 
+        pas_stats = []
+        def unpairedTTest(avgdata,measured_metric):
+            hAPP = avgdata[avgdata['strain']=='hAPP']
+            B6J = avgdata[avgdata['strain']=='B6J']
+
+            group1 = hAPP[measured_metric]
+            group2 = B6J[measured_metric]
+
+            stat, pvalue = ttest_ind(group1,group2,equal_var = 0)
+            nGroup1 = len(group1)
+            nGroup2 = len(group2)
+            
+            print(measured_metric)
+            print('hAPP variance: ',statistics.variance(group1))
+            print('B6J variance: ',statistics.variance(group2))
+
+            return [measured_metric,nGroup1,nGroup2,stat,pvalue]
         
-    if 0: # plot a boxplot for a spike params
+
+        pas_stats.append(unpairedTTest(avgdata,'membrane_tau'))
+        pas_stats.append(unpairedTTest(avgdata,'input_resistance'))
+        pas_stats.append(unpairedTTest(avgdata,'membrane_capacitance'))
+        pas_stats.append(unpairedTTest(avgdata,'RMP'))
+
+        with open("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/compiled_pas_stats-nonequal-2.csv", "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(['metric','n (hAPP)','n (B6J)','stat','p-value'])
+            writer.writerows(pas_stats)
+
+    if 1: # plot a boxplot for a spike params
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params-2.csv'))
         alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 3)] # only first AP
         
@@ -350,11 +423,11 @@ def makePatchStatsFigs(csv_path):
         for metric in metrics:
             # Removing outliers from the 'pA/pF' column for each current injection group
             cleaned_df = alldata.groupby('strain').apply(lambda x: remove_outliers(x, metric)).reset_index(drop=True)
-        print("OUTLIERS: ",len(alldata)-len(cleaned_df))
+        print("data: ",len(cleaned_df))
 
         PROPS = setProps('black')
-        fig2, axs2 = plt.subplots(ncols=4+1)#,nrows=2)
-        fig2.set_size_inches(11,3)
+        fig2, axs2 = plt.subplots(ncols=4)#,nrows=2)
+        fig2.set_size_inches(10,3)
         w = .2
         huestr = "sex"
         palstr = ['orangered','royalblue']
@@ -381,10 +454,42 @@ def makePatchStatsFigs(csv_path):
         for i in [0,1,2,3]:
             axs2[i].get_legend().remove()
             # print(0)
-        handles, labels = axs2[3].get_legend_handles_labels()
-        fig2.legend(handles, labels, loc='upper right',bbox_to_anchor=(1.25,0.5))
+        # handles, labels = axs2[3].get_legend_handles_labels()
+        # fig2.legend(handles, labels, loc='upper right')
 
         plt.tight_layout()
+
+         # ________ Test for ttest _________ 
+        pas_stats = []
+        def unpairedTTest(avgdata,measured_metric):
+            hAPP = avgdata[avgdata['strain']=='hAPP']
+            B6J = avgdata[avgdata['strain']=='B6J']
+
+            group1 = hAPP[measured_metric]
+            group2 = B6J[measured_metric]
+
+            stat, pvalue = ttest_ind(group1,group2,equal_var = 0)
+            nGroup1 = len(group1)
+            nGroup2 = len(group2)
+            
+            print(measured_metric)
+            print('hAPP variance: ',statistics.variance(group1))
+            print('B6J variance: ',statistics.variance(group2))
+
+            return [measured_metric,nGroup1,nGroup2,stat,pvalue]
+        
+
+        pas_stats.append(unpairedTTest(alldata,'AP peak'))
+        pas_stats.append(unpairedTTest(alldata,'AP hwdt'))
+        pas_stats.append(unpairedTTest(alldata,'AHP'))
+        pas_stats.append(unpairedTTest(alldata,'threshold'))
+        pas_stats.append(unpairedTTest(alldata,'dV/dt max'))
+
+        with open("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/compiled_spike_stats-nonequal-2.csv", "w") as f:
+            writer = csv.writer(f)
+            writer.writerow(['metric','n (hAPP)','n (B6J)','stat','p-value'])
+            writer.writerows(pas_stats)
+
 
     # if 1: # run this to plot ap peak vs ap num, not yet done 
     #     alldata = pd.read_csv(join(csv_path,'compiled_spike_params.csv'))

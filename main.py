@@ -33,7 +33,7 @@ abf_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Da
 save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/'
 
 # reads all abf files in the abf_filepath and returns csvs for each file with passive params, firing params, and spike params
-# pABF.readABFs(abf_path,save_path,brainslice=False)
+# pABF.readABFs(abf_path,save_path,brainslice=True)
 
 # reads the csvs generated above and creates figures
 pABF.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs")
