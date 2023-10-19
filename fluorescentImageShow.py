@@ -48,10 +48,10 @@ if 0: # make gif
     # myAnim.save('zstack.mp4')
     plt.show()
 
-if 0: # for gfp
+if 1: # for gfp
     n = 3
-    gfp_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/gfp'+str(n)+'/Pos0/img_000000000_Default_000.tif'
-    root_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/'
+    gfp_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/Moscow Rig/merc images/2023-06-05/gfp3/Pos0/img_000000000_Default_000.tif'
+    # root_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/'
     BW2 = plt.imread(gfp_img)/255
     BW_adj2 = (BW2 - BW2.min())/(BW2.max()-BW2.min())-.2
 
@@ -59,12 +59,14 @@ if 0: # for gfp
     plt.axis('off')
     plt.tight_layout()
 
-    plt.savefig(join(root_path,str(n)+'gfp.png'),bbox_inches='tight')
-    plt.show()
+    # plt.savefig(join(root_path,str(n)+'gfp.png'),bbox_inches='tight')
+    # plt.show()
 
-if 0: # for compositing
-    dic_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/merc images/2023-06-06/dic 4x/Pos0/img_000000000_Default_000.tif'
-    gfp_img = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/merc images/2023-06-06/gfp 4x/Pos0/img_000000000_Default_000.tif"
+if 1: # for compositing
+    fig = plt.figure()
+
+    dic_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/Moscow Rig/merc images/2023-06-05/dic3/Pos0/img_000000000_Default_000.tif'
+    # gfp_img = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/merc images/2023-06-06/gfp 4x/Pos0/img_000000000_Default_000.tif"
     
     # dic_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/dic'+str(n)+'/Pos0/img_000000000_Default_000.tif'
     # gfp_img = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/merc images/2023-06-05/gfp'+str(n)+'/Pos0/img_000000000_Default_000.tif'
@@ -73,13 +75,13 @@ if 0: # for compositing
     BW1 = plt.imread(dic_img)/255
     BW_adj1 = (BW1 - BW1.min())/(BW1.max()-BW1.min())
 
-    BW2 = plt.imread(gfp_img)/255
-    BW_adj2 = (BW2 - BW2.min())/(BW2.max()-BW2.min())-.2
-    zer = np.zeros(BW2.shape)
-    RGB = np.stack((zer,BW_adj2,zer),2)
+    # BW2 = plt.imread(gfp_img)/255
+    # BW_adj2 = (BW2 - BW2.min())/(BW2.max()-BW2.min())-.2
+    # zer = np.zeros(BW2.shape)
+    # RGB = np.stack((zer,BW_adj2,zer),2)
 
-    plt.imshow(RGB,alpha=1)
-    plt.imshow(BW_adj1,cmap='gray',alpha=.3)
+    # plt.imshow(RGB,alpha=1)
+    plt.imshow(BW_adj1,cmap='gray',alpha=1)
     plt.axis('off')
     plt.tight_layout()
 

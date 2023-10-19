@@ -37,32 +37,23 @@ def getCommandSweep(d,sweepNum):
 
 base_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/2023-07-25/"
 save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/currentclamp_pngs/"
-abf_list = [f for f in listdir(base_path) if isfile(join(base_path,f)) & f.endswith(".abf")]
+# abf_list = [f for f in listdir(base_path) if isfile(join(base_path,f)) & f.endswith(".abf")]
+filename = '23725018.abf'
+abf = pyabf.ABF(join(base_path,filename))
+myData = abf2class(abf)
+print("Numsweeps: ",myData.numSweeps)
 
-for a in abf_list:
-    print("File: ",a)
-    abf = pyabf.ABF(join(base_path,a))
-    myData = abf2class(abf)
-    print("Numsweeps: ",myData.numSweeps)
+for i in range(myData.numSweeps):
+    # sweepnum= 4 # change this
+    plt.figure(figsize = (12, 6))
 
-    if myData.numSweeps <= 5:
-        print("\tnot enough sweeps.")
-    else:
-        length = len(myData.time)
-        mid = int(round(length/2,1))
-        
-        plt.figure(figsize = (12, 6))
+    x = getCurrentSweep(myData,i)
+    t = myData.time
+    plt.plot(t, x,linewidth=.5)
 
-        for i in range(myData.numSweeps):
-            if np.mod(i,3) == 0:
-                x = getCurrentSweep(myData,i)
-                t = myData.time
-                plt.plot(t, x,linewidth=.5)
+    plt.xlabel('Time (s)')
+    plt.ylabel('current (pA)')
+    plt.title(filename)
+    plt.tight_layout()
 
-        plt.xlabel('Time (s)')
-        plt.ylabel('current (pA)')
-        plt.title(a)
-        plt.tight_layout()
-
-        # plt.savefig(join(save_path,a+'.png'))
-        plt.clf()
+    plt.show()

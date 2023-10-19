@@ -18,7 +18,7 @@ from scipy import optimize, integrate
 import regex as re
 
 def getResponseDataSweep(d,sweepNum):
-    return d.response[sweepNum,:]
+    return d.current[sweepNum,:]
 
 def getCommandSweep(d,sweepNum):
     return d.command[sweepNum,:]
@@ -35,11 +35,13 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
     n_params = 5 + 1 # for fn
     all_data = np.empty((n_sweeps, n_params))
     try:
-        voltage_data = getResponseDataSweep(d,0)
+        # voltage_data = getResponseDataSweep(d,0)
+        voltage_data = d.current[0,:]
+        print("ready.")
     except:
         return
     # for each sweep in the abf, find the passive properties and save to the array 
-    for sweep in range(d.numSweeps): 
+    for sweep in [1]: 
         voltage_data = getResponseDataSweep(d,sweep)
         dt = 1/d.sampleRate
         command_current = getCommandSweep(d,sweep)
@@ -47,8 +49,9 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
         starts = np.where(del_com<0)
         ends = np.where(del_com>0)
         # these should be for passive properties (ie 1st step down)
-        passive_start = starts[0][0]
-        passive_end = ends[0][0]
+        const = 0
+        passive_start = starts[0][0] + const
+        passive_end = ends[0][0] - const
 
         mean1 = np.mean(voltage_data[0 : passive_start-1])  #calculate Rm/input_resistance
         mean2 = np.mean(voltage_data[int(passive_start + (0.1 / dt)) : passive_end])
@@ -68,14 +71,18 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
         X1 = d.time[passive_start : int((passive_start + (0.1 / dt)))]           #calculate membrane tau
         Y1 = voltage_data[passive_start : int((passive_start + (0.1 / dt)))]
 
-        p0 = (20, 10, 50)
+        # p0 = (100, 17, 1000)
+        p0 = (6.123e12, 54.097, -48.3)
         try:
-            params, cv = scipy.optimize.curve_fit(monoExp, X1[::50], Y1[::50], p0, maxfev = 10000)
+            params, cv = scipy.optimize.curve_fit(monoExp, X1[::50], Y1[::50], p0, maxfev = 100000000)
             m, t, b = params
+            print("samplerate: ",sampleRate)
             sampleRate = int(1 / dt / 1000)+1
-            membrane_tau =  ((1 / t) / sampleRate) * 1e6 / 20
+            membrane_tau =  ((1 / t) / sampleRate) * 1e6 / abs(pas_stim)
             membrane_capacitance = membrane_tau / input_resistance *1000
-
+            print("tau: ",membrane_tau)
+            print("cap: ",membrane_capacitance)
+            print("step down: ",pas_stim)
         except:
             m = 0
             t = 0
@@ -115,10 +122,17 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
             plt.plot(d.time,monoExp(d.time, m, t, b))
             plt.scatter([d.time[passive_start],d.time[passive_end]],[voltage_data[passive_start],voltage_data[passive_end]],c='red')
             plt.ylim([min_lim,max_lim])
-            plt.xlim([0,.3])
+            plt.xlim([.4,1.1])
             plt.savefig(filename+".png")
+            plt.show()
             plt.clf()
-    
+
+        print("Tau: ",membrane_tau)
+        print("Capacitance: ",membrane_capacitance)
+
+        # delete this
+        base_fn = 111
+
         all_data[sweep,:] = [int(base_fn),membrane_tau, input_resistance, membrane_capacitance, resting, fit_err]
     return all_data 
 

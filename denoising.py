@@ -35,24 +35,32 @@ def getCurrentSweep(d,sweepNum):
 def getCommandSweep(d,sweepNum):
     return d.command[sweepNum,:]
 
-abf = pyabf.ABF("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/2023-06-05/23605011.abf")
+save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/Moscow Rig/FilesFromMoscowRig/patch-walk/connectivity_data/pair-rec/matrix-0512/images/"
+abf = pyabf.ABF("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/Moscow Rig/FilesFromMoscowRig/patch-walk/connectivity_data/pair-rec/matrix-0512/pair3/23512033.abf")
 myData = abf2class(abf)
 length = len(myData.time)
 mid = int(round(length/2,1))
+dt = myData.time[1]-myData.time[0]
 
-x = getCurrentSweep(myData,4)
+x = getCurrentSweep(myData,0)
 
 if 0:
     x = x[mid:-1] - np.average(x[mid:-1])
     t = myData.time[1:mid]
 else:
-    x = x - np.average(x)
-    t = myData.time
+    xtemp = x - np.average(x)
+    ttemp = myData.time
+
+    x = xtemp[int(8.8/dt):int(9.15/dt)]
+    t = ttemp[0:int((9.15-8.8)/dt)+1]
+
+    print(len(x))
+    print(len(t))
 
 
 fs = myData.sampleRate  # Sample frequency (Hz)
 f0 = 60   # Frequency to be removed from signal (Hz)
-Q = 30  # Quality factor
+Q = 10  # Quality factor
 
 # Design notch filter
 b_notch, a_notch = signal.iirnotch(f0, Q, fs)
@@ -70,12 +78,11 @@ filt_X = fft(filt_x)
 plt.figure(figsize = (12, 6))
 
 plt.subplot(221)
-plt.stem(freq, np.abs(X)/len(x), 'b', \
+plt.stem(freq, np.abs(X)/len(x)+ np.average(x), 'b', \
          markerfmt=" ", basefmt="-b")
 plt.xlabel('Freq (Hz)')
 plt.ylabel('FFT Amplitude |X(freq)|')
-# plt.xlim(0, 250)
-# plt.ylim(0,.2)
+plt.xlim(0, 100)
 
 plt.subplot(222)
 plt.plot(t, ifft(X), 'r')
@@ -83,12 +90,11 @@ plt.xlabel('Time (s)')
 plt.ylabel('Amplitude')
 
 plt.subplot(223)
-plt.stem(freq, np.abs(filt_X)/len(filt_x), 'b', \
+plt.stem(freq, np.abs(filt_X)/len(filt_x) + np.average(x), 'b', \
          markerfmt=" ", basefmt="-b")
 plt.xlabel('Freq (Hz)')
 plt.ylabel('FFT Amplitude |X(freq)|')
-# plt.xlim(0, 250)
-# plt.ylim(0,.25)
+plt.xlim(0, 100)
 
 plt.subplot(224)
 plt.plot(t, ifft(filt_X), 'r')
@@ -96,4 +102,7 @@ plt.xlabel('Time (s)')
 plt.ylabel('Amplitude')
 
 plt.tight_layout()
+
+plt.savefig(join(save_path,'23512035.png'), format='png', dpi=300)
+
 plt.show()

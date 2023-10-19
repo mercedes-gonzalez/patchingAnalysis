@@ -174,7 +174,7 @@ def makePatchStatsFigs(csv_path):
             'capprops':{'color':color}
             }
         return PROPS
-    if 1: # run this to plot current vs firing freq
+    if 0: # run this to plot current vs firing freq
         alldata = pd.read_csv(join(csv_path,'compiled_firing_freq-2.csv'))
         print('alldata: ',len(alldata))
 
@@ -273,7 +273,7 @@ def makePatchStatsFigs(csv_path):
         plt.legend(['hAPP','B6J'])
         plt.tight_layout()
 
-        if 1:
+        if 0:
             # normality violin plots - one plot with B6 vs hAPP
             fig3, axs3 = plt.subplots(1)
             fig3.set_size_inches(16,8)
@@ -305,7 +305,7 @@ def makePatchStatsFigs(csv_path):
 
 
         plt.show()
-    if 1: # plot a boxplot for a passive param
+    if 0: # plot a boxplot for a passive param
         alldata = pd.read_csv(join(csv_path,'compiled_pas_params-2.csv'))
         alldata = alldata.loc[(alldata['fit_err'] <= .5) & (alldata['membrane_tau'] > 0) & (alldata['membrane_tau'] < 85)]
         
@@ -407,7 +407,7 @@ def makePatchStatsFigs(csv_path):
             writer.writerow(['metric','n (hAPP)','n (B6J)','stat','p-value'])
             writer.writerows(pas_stats)
 
-    if 1: # plot a boxplot for a spike params
+    if 0: # plot a boxplot for a spike params
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params-2.csv'))
         alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 3)] # only first AP
         
