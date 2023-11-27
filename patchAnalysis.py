@@ -18,7 +18,7 @@ from scipy import optimize, integrate
 import regex as re
 
 def getResponseDataSweep(d,sweepNum):
-    return d.current[sweepNum,:]
+    return d.response[sweepNum,:]
 
 def getCommandSweep(d,sweepNum):
     return d.command[sweepNum,:]
@@ -32,16 +32,11 @@ def monoExp(x, m, t, b):
 def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn is the name of the abf
     # initialize the array to save all the parameters
     n_sweeps = d.numSweeps
-    n_params = 5 + 1 # for fn
+    n_params = 5
     all_data = np.empty((n_sweeps, n_params))
-    try:
-        # voltage_data = getResponseDataSweep(d,0)
-        voltage_data = d.current[0,:]
-        print("ready.")
-    except:
-        return
+
     # for each sweep in the abf, find the passive properties and save to the array 
-    for sweep in [1]: 
+    for sweep in range(n_sweeps): 
         voltage_data = getResponseDataSweep(d,sweep)
         dt = 1/d.sampleRate
         command_current = getCommandSweep(d,sweep)
@@ -60,35 +55,29 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
         pas_stim = np.mean(command_current[passive_start + 10 : passive_start + 110]) - holding
 
         input_resistance = (abs(mean1-mean2) / abs(pas_stim) ) * 1000 # Steady state delta V/delta I
-        
         resting = mean1 - (input_resistance * holding) / 1000
-
-        # voltage_data = getResponseDataSweep(d,0)
-        # command = getCommandSweep(d,0)
 
         import scipy.optimize
 
         X1 = d.time[passive_start : int((passive_start + (0.1 / dt)))]           #calculate membrane tau
         Y1 = voltage_data[passive_start : int((passive_start + (0.1 / dt)))]
 
-        # p0 = (100, 17, 1000)
-        p0 = (6.123e12, 54.097, -48.3)
+        p0 = (20, 10, voltage_data[passive_end])
+
         try:
-            params, cv = scipy.optimize.curve_fit(monoExp, X1[::50], Y1[::50], p0, maxfev = 100000000)
+            npoints = 25
+            params, cv = scipy.optimize.curve_fit(monoExp, X1[::npoints], Y1[::npoints], p0, maxfev = 100000)
             m, t, b = params
-            print("samplerate: ",sampleRate)
             sampleRate = int(1 / dt / 1000)+1
             membrane_tau =  ((1 / t) / sampleRate) * 1e6 / abs(pas_stim)
             membrane_capacitance = membrane_tau / input_resistance *1000
-            print("tau: ",membrane_tau)
-            print("cap: ",membrane_capacitance)
-            print("step down: ",pas_stim)
         except:
-            m = 0
-            t = 0
-            b = 0
-            membrane_tau = 0
-            membrane_capacitance = 0
+            m = .5
+            t = .5
+            b = .5
+            membrane_tau = .5
+            membrane_capacitance = .5
+            print('failed to fit.')
 
         """
             if tauSec > 100 or tauSec < 6:
@@ -122,18 +111,14 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
             plt.plot(d.time,monoExp(d.time, m, t, b))
             plt.scatter([d.time[passive_start],d.time[passive_end]],[voltage_data[passive_start],voltage_data[passive_end]],c='red')
             plt.ylim([min_lim,max_lim])
-            plt.xlim([.4,1.1])
-            plt.savefig(filename+".png")
-            plt.show()
+            # plt.xlim([.4,1.1])
+            plt.title(sweep)
+            if sweep == 0:
+                plt.savefig(filename+".png")
+                # plt.show()
             plt.clf()
 
-        print("Tau: ",membrane_tau)
-        print("Capacitance: ",membrane_capacitance)
-
-        # delete this
-        base_fn = 111
-
-        all_data[sweep,:] = [int(base_fn),membrane_tau, input_resistance, membrane_capacitance, resting, fit_err]
+        all_data[sweep,:] = [membrane_tau, input_resistance, membrane_capacitance, resting, fit_err]
     return all_data 
 
 def running_mean(x, N):                                                     #running mean to avoid measuring noise
@@ -143,85 +128,96 @@ def running_mean(x, N):                                                     #run
 def moving_average(x, w): # for memtest 
     return np.convolve(x, np.ones(w), 'same') / w
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
 
-def analyze_memtest_negative(time,rec_current,fn,verbose):
-    base_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/patch-walk/patcherbotData/summary-stats/check-plots/memtests/"    
-    expFunc = lambda t,A,tau,I1 : A*np.exp(-t/tau)+I1
+def analyzeMemtest(myData,base_fn,save_path,verbose):
+    time = myData.time
+    rec_current = myData.response
+
+    expFunc = lambda t,m,tau,I1 : m*np.exp(-t/tau)+I1
 
     pico = 10**-12
     milli = 10**-3
     mega = 10**-6
     # rec_current = rec_current* # convert current from pA to A
 
-    filtered_current = moving_average(rec_current,30) # A
+    filtered_current = moving_average(rec_current,20) # A
 
     # define indices
     max_current = rec_current.max() #A
-    start_idx = 1 # hardcoded indices bc i'm tired
-    end_idx = 300
+    start_idx = 71 #np.argmax(filtered_current)+10 # hardcoded indices bc i'm tired
+    end_idx = start_idx + 300
 
     # parse data 
     T_fit = time[start_idx:end_idx] # sec
     I_fit = filtered_current[start_idx:end_idx] # A
 
     # remove steady state parts? 
-    mid = int(len(rec_current)/2) #A
-    quart = int(mid/2) #A
-    T1 = time[quart:mid] #sec
-    I1 = np.average(rec_current[quart:mid]) #A
-
-    [A, tau, I1], _ = optimize.curve_fit(expFunc, T_fit, I_fit,p0=(250,.0035,50))
+    I1 = np.average(rec_current[600:700]) # hardcoded indices
+    try:
+        [m, tau, Iss], _ = optimize.curve_fit(expFunc, T_fit, I_fit,p0=(600,.0035,30),maxfev = 100000) #bounds=((0,3000),(0,0.0075),(-200,200))
+        
+    except:
+        print(base_fn, " could not find fit.")
+        return
     
-    print("m: ", A)
-    print('b: ',I1)
-    print("tau: ",tau)
-    Iss = I1 #A
-    Idss = (max_current-I1) #A
-    deltaV = 10*milli # convert from mV to V
-    Ra = abs(deltaV/(Idss)) # Ohms
-    # Rm = (deltaV - (Ra*Idss))/Idss # Ohms
-    # R_tot = 1/((1/Ra)+(1/Rm))*mega #Ohms
-    # Cm = (tau1*milli)/R_tot #Farads
+    # print('\tmetrics: ', [m, tau, Iss])
+    Iprev = np.average(rec_current[0:10])
+    Idss = (I1-Iprev)
+    Ipeak = m + Iss
+    Id = Ipeak-Iprev
 
+    deltaV = 10*milli # convert from mV to V
+    Ra = abs(deltaV/(Id)) # Ohms
+    Rm = (deltaV - (Ra*Idss))/Idss # Ohms
+    R_tot = 1/((1/Ra)+(1/Rm)) #Ohms
+    Cm = (tau)/R_tot #Farads
+    cell_tau = Rm*Cm
 
     if verbose:
-        # print("I1 = ",I1/pico)
+        print("I1 = ",I1)
+        print("Iprev = ", Iprev)
+        print("Idss =", Idss)
+        print("Ipeak = ",Ipeak)
+        print("Id = ",Id)
+        print("Iss = ",Iss)
         print("Ra (MOhm)= ",Ra/mega)
-        print("tau (ms) = ",tau/milli)
-        # print("Rm (MOhm)= ", Rm*mega)
-        # print("Rt (MOhm)= ", R_tot*mega)
-        # print("Cm (pF)= ", Cm/pico)
+        print("cell tau (ms) = ",Cm*Rm)
+        print("Rm (MOhm)= ", Rm/mega)
+        print("Rt (MOhm)= ", R_tot/mega)
+        print("Cm (pF)= ", Cm)
 
     # plot and save for checking. also calculate error in fitting. 
-    fit_err = np.average(abs((expFunc(time[start_idx:end_idx],A,tau,I1)-rec_current[start_idx:end_idx])))
+    fit_err = np.average(abs((expFunc(time[start_idx:end_idx],m,tau,I1)-rec_current[start_idx:end_idx])))
 
     # find limits for the y-axis
     max_lim = np.max(rec_current[start_idx:end_idx]) + 100 
     min_lim = np.min(rec_current[start_idx:end_idx]) - 100
-    
-    step1 = re.sub("lvm","png",fn)
-    fullfilename = join(base_path,step1)
 
     # plot for checking fitting
     plt.plot(time,rec_current)
-    plt.plot(T_fit,expFunc(T_fit, A, tau, I1))
+    plt.plot(T_fit,expFunc(T_fit, m, tau, Iss))
+    plt.plot(T_fit,I_fit)
     plt.scatter([time[start_idx],time[end_idx]],[rec_current[start_idx],rec_current[end_idx]],c='red')
     
     plt.ylim([min_lim,max_lim])
-    plt.xlim([0,.05])
-    plt.savefig(fullfilename)
+    # plt.xlim([0,.05])
+    plt.savefig(join(save_path,base_fn+'.png'))
     plt.clf()
 
     # return the stats we need 
     access_resistance = Ra
-    # holding_current = Iss
-    # membrane_resistance = Rm
-    # membrane_capacitance = Cm
+    holding_current = Iss
+    membrane_resistance = Rm
+    membrane_capacitance = Cm
     fit_error = fit_err
 
-
-    # return [access_resistance, holding_current, membrane_resistance, membrane_capacitance, fit_error]
-    return [access_resistance/mega, fit_error]
+    # print(base_fn,'\t',access_resistance/mega, '\t',holding_current, '\t',membrane_resistance/mega, '\t',membrane_capacitance)
+    return [access_resistance/mega, holding_current, membrane_resistance/mega, membrane_capacitance, cell_tau/milli, fit_error]
+    # return [access_resistance/mega, fit_error]
 
 ''' analyze memtest
 def analyze_memtest(time,command_voltage,rec_current,fn,verbose):
@@ -343,7 +339,7 @@ def calc_sag():
 '''
 
 def calc_freq(d,fn):     #calculate mean and max firing frequency
-    fn = int(fn)
+    # fn = int(fn)
     # d is a data object (custom defined class called data)
     dt = 1/d.sampleRate
 
@@ -364,23 +360,23 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
     stim_length = (stim_end - stim_start)/d.sampleRate
 
     # print("stimlength:", stim_length)
-    all_avgs = np.empty((d.numSweeps,4))
+    all_avgs = np.empty((d.numSweeps,3))
 
     # make logical mask to determine current injection sweep
     command = getCommandSweep(d,0)
     baseline_cmd = np.array(command[0:10]).mean() #get baseline command (no input)
     is_on = command < baseline_cmd # Create logical mask for when command input is on
 
-    num_rows = 4
+    num_rows = 3
     num_cols = 4
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(14, 8))
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(16, 10))
     
     def plot_subplots(ax,row,col,x,y,peakx,peaky,title):
         ax[row,col].plot(x,y,linewidth=1)
         ax[row,col].scatter(peakx,peaky,color='r',s=1)
         ax[row,col].set_title(title)
 
-    positions = np.reshape(np.arange(16),(4,4))
+    positions = np.reshape(np.arange(12),(3,4))
 
     for sweep in range(d.numSweeps):
         current = getResponseDataSweep(d,sweep)
@@ -395,15 +391,15 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         
         # GET NUMBER OF ACTION POTENTIALS
         baseline_data = np.array(current[0:10]).mean() # get baseline data
-        peaks, prop = sig.find_peaks(current,prominence=10,height=.5*((max(current)-min(current))/2+min(current)))
+        peaks, prop = sig.find_peaks(moving_average(current,50),prominence=.5,height=(.3*(max(current)-min(current))+min(current)))
 
         num_APs = len(peaks)
-        save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/ADfigs/currentclamp_pngs/"
+        save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/currentclamp_pngs/"
         
 
         # add to the subplots
-        if sweep < 16:
-            ax_idx = np.hstack(np.where(positions == sweep))
+        if sweep > 1 and sweep < 14:
+            ax_idx = np.hstack(np.where(positions == sweep-2))
             row = ax_idx[0]
             col = ax_idx[1]
             plot_subplots(axes,row,col,d.time,current,d.time[peaks],current[peaks],fn)
@@ -429,9 +425,12 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         mean_firing_frequency = mean_freq
         currentinj = command[stim_start+5]
         # max_firing_frequency = max_freq
-        all_avgs[sweep,:] = (fn,sweep,currentinj,mean_firing_frequency)
+        all_avgs[sweep,:] = (sweep+1,currentinj,mean_firing_frequency)
     
     plt.savefig(join(save_path,str(fn)+'.png'))
+    plt.clf()
+    plt.close()
+    # plt.show()
     return all_avgs
 
 ''' calc acc ratio
@@ -524,8 +523,8 @@ def spike_scaling():
     #return freq_list, curr_list
 '''
 
-def calc_all_spike_params(d,filename,save_path,ssh):
-    full_path = join(save_path,filename)
+def calc_all_spike_params(d,filename,save_path,sshcr,extension):
+    full_path = join(save_path,filename + extension)
     if exists(full_path+'.csv'):
         os.remove(full_path+'.csv')
 
@@ -535,6 +534,8 @@ def calc_all_spike_params(d,filename,save_path,ssh):
         "strain" + "," +
         "sex" + "," +
         "hemisphere" + "," +
+        "cell_type" + "," +
+        "region" + "," +
         "sweep" + "," +
         "pA/pF" + "," +
         "current inj" + "," +
@@ -605,9 +606,11 @@ def calc_all_spike_params(d,filename,save_path,ssh):
                 papf = 2*sweep - 2
 
                 f.write(filename + "," +
-                        ssh[0] + "," +
-                        ssh[1] + "," +
-                        ssh[2] + "," +
+                        sshcr[0] + "," +
+                        sshcr[1] + "," +
+                        sshcr[2] + "," +
+                        sshcr[3] + ',' +
+                        sshcr[4] + ',' +
                         str(sweep + 1) + "," +
                         str(papf) + "," +
                         str(currentinj) + "," +
