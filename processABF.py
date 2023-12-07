@@ -107,6 +107,10 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
     mt_path = join(save_path,"memtest_params")
     if not isdir(mt_path):
         mkdir(mt_path)
+
+    svg_path = join(save_path,"svgs")
+    if not isdir(mt_path):
+        mkdir(mt_path)
     
     # read main.xlsx for all cell info
     df = pd.read_excel(main_filename,dtype=str)
@@ -160,6 +164,9 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 save_pas_params_df.insert(0,"hemisphere",cell.hemisphere)
                 save_pas_params_df.insert(0,"region",cell.region)
                 save_pas_params_df.insert(0,"cell_type",cell.cell_type)
+                save_pas_params_df.insert(0,"X",cell.X)
+                save_pas_params_df.insert(0,"Y",cell.Y)
+
 
             save_pas_params_df.to_csv(join(pas_path,base_fn+'-pas_params-FPC.csv'),index=False)
         else: 
@@ -193,6 +200,8 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 save_firing_params_df.insert(1,"hemisphere",cell.hemisphere)
                 save_firing_params_df.insert(1,"region",cell.region)
                 save_firing_params_df.insert(1,"cell_type",cell.cell_type)
+                save_firing_params_df.insert(0,"X",cell.X)
+                save_firing_params_df.insert(0,"Y",cell.Y)
 
             save_firing_params_df.to_csv(join(firing_path,base_fn+'-firing_params-FPC.csv'),index=False)
 
@@ -232,6 +241,8 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 save_pas_params_df.insert(0,"hemisphere",cell.hemisphere)
                 save_pas_params_df.insert(0,"region",cell.region)
                 save_pas_params_df.insert(0,"cell_type",cell.cell_type)
+                save_pas_params_df.insert(0,"X",cell.X)
+                save_pas_params_df.insert(0,"Y",cell.Y)
 
             save_pas_params_df.to_csv(join(pas_path,base_fn+'-pas_params-FPU.csv'),index=False)
         else: 
@@ -265,6 +276,9 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 save_firing_params_df.insert(1,"hemisphere",cell.hemisphere)
                 save_firing_params_df.insert(0,"region",cell.region)
                 save_firing_params_df.insert(0,"cell_type",cell.cell_type)
+                save_firing_params_df.insert(0,"X",cell.X)
+                save_firing_params_df.insert(0,"Y",cell.Y)
+                
             save_firing_params_df.to_csv(join(firing_path,base_fn+'-firing_params-FPU.csv'),index=False)
 
             sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region]

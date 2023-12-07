@@ -40,6 +40,9 @@ def makePatchStatsFigs(csv_path):
         return PROPS
     
     brain_region = 'mPFC'
+    distvar = 'Y'
+
+    save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/'
     if 1: # run this to plot current vs firing freq
         alldata = pd.read_csv(join(csv_path,'compiled_firing_freq-FPC.csv'))
         alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == 'interneuron')]
@@ -93,6 +96,10 @@ def makePatchStatsFigs(csv_path):
             writer.writerows(stats)
         
         # _____________ ANOVA statistics just sex and strain ____________________-
+        region_path = join(save_path,brain_region)
+        if not isdir(region_path):
+            mkdir(region_path)
+
         save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/'
         unique_pApF_values = selectdata[xaxisstr].unique().tolist()
         for inj in unique_pApF_values: #get unique pApF and do the stats for each injection value
@@ -100,7 +107,7 @@ def makePatchStatsFigs(csv_path):
             model = ols('mean_firing_frequency ~ C(strain)',data=current_inj_df).fit()
             result = sm.stats.anova_lm(model,typ=2)
             print(result)
-            result.to_csv(join(save_path,str(inj)+'.csv'), index=True)
+            result.to_csv(join(save_path,brain_region,str(inj)+brain_region+'.csv'), index=True)
 
         # ___________________ hAPP vs B6 stats _________________________
         stats = []
@@ -111,23 +118,56 @@ def makePatchStatsFigs(csv_path):
             print(f"Group: {group_name}, N: {nsamples}, Shapiro-Wilk Statistic: {shapiro_stat:.4f}, p-value: {shapiro_p_value:.4f}")
             stats.append([group_name[0],group_name[1],nsamples,shapiro_stat,shapiro_p_value])
         
-        with open("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/firing_stats-"+brain_region+"-B6vshAPP.csv", "w") as f:
+        with open(join(region_path,"firing_stats-"+brain_region+"-B6vshAPP.csv"), "w") as f:
             writer = csv.writer(f)
             writer.writerow(['strain','current_inj','numSamples','SW-stat','p-value'])
             writer.writerows(stats)
         # _______________________________________________________________
+        
+        if 1:
+            hAPPdata = hAPPdata[hAPPdata[distvar] != 'na']
+            B6Jdata = B6Jdata[B6Jdata[distvar] != 'na']
+            plt.figure()
+            colormin=0
+            colormax = max(pd.to_numeric(hAPPdata[distvar]))
+            print(colormax)
+            colormap = "rainbow"
 
+            nums = np.random.uniform(-1,1,len(hAPPdata['est_pA/pF']))
+            s = plt.scatter(pd.to_numeric(hAPPdata['est_pA/pF'])+nums/2,
+                            pd.to_numeric(hAPPdata['mean_firing_frequency']),
+                            c=pd.to_numeric(hAPPdata[distvar]),
+                            vmin=colormin,
+                            vmax=colormax,
+                            cmap=colormap)
+            plt.title("hAPP " +brain_region)
+            plt.xlabel("Current Injection (pA/pF)")
+            plt.ylabel("Mean firing frequency (Hz)")
+            plt.ylim([0,300])
+            plt.colorbar(label=distvar)
+
+            plt.figure()
+            nums = np.random.uniform(-1,1,len(B6Jdata['est_pA/pF']))
+            s = plt.scatter(pd.to_numeric(B6Jdata['est_pA/pF'])+nums/2,
+                            pd.to_numeric(B6Jdata['mean_firing_frequency']),
+                            c=pd.to_numeric(B6Jdata[distvar]),
+                            vmin=colormin,
+                            vmax=colormax,
+                            cmap=colormap)
+            plt.title("B6J "+brain_region)
+            plt.xlabel("Current Injection (pA/pF)")
+            plt.ylabel("Mean firing frequency (Hz)")
+            plt.ylim([0,300])
+            plt.colorbar(label=distvar)
+            plt.show()
+    
         fig, axs = plt.subplots()
         fig.set_size_inches(4,4)
         
         # Plotting the error bar plot
         lw = 2
-        ms = 7
-        # plt.scatter(x='est_pA/pF',y='mean_firing_frequency',marker="o",data=hAPPdata)
-        # plt.scatter(x='est_pA/pF',y='mean_firing_frequency',marker="o",data=B6Jdata)
-        # plt.legend(['hAPP','B6J'])
-        # plt.show()
-    
+        ms = 5
+
         plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.xlabel('Current Injection (pA/pF)')
@@ -135,15 +175,17 @@ def makePatchStatsFigs(csv_path):
         plt.ylim([0,250])
         plt.xlim([0,32])
         plt.legend(['hAPP','B6J'])
+        plt.title(brain_region)
         plt.tight_layout()
-        plt.savefig(brain_region+'.svg',dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region+'firing.svg'),dpi=300,format='svg')
+        plt.show()
 
         if 0:
             # normality violin plots - one plot with B6 vs hAPP
             fig3, axs3 = plt.subplots(1)
             fig3.set_size_inches(16,8)
 
-            sns.violinplot(data=selectdata,x='pApF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3).set(title="hAPP vs B6J")
+            sns.violinplot(data=selectdata,x='est_pA/pF',y='mean_firing_frequency',hue='strain',split=True,ax=axs3).set(title="hAPP vs B6J")
             plt.tight_layout()
         if 0:
             # normality violin plots - two plots, for M and F 
@@ -249,7 +291,7 @@ def makePatchStatsFigs(csv_path):
             axs2[i].get_legend().remove()
 
         plt.tight_layout()
-        plt.savefig(brain_region + '-pas.svg',dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region + '-pas.svg'),dpi=300,format='svg')
 
         # pas_stats = []
         # def unpairedTTest(avgdata,measured_metric):
@@ -336,7 +378,7 @@ def makePatchStatsFigs(csv_path):
         # fig2.legend(handles, labels, loc='upper right')
 
         plt.tight_layout()
-        plt.savefig(brain_region+'-spike.svg',dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region+'-spike.svg'),dpi=300,format='svg')
          # ________ Test for ttest _________ 
         pas_stats = []
         def unpairedTTest(avgdata,measured_metric):

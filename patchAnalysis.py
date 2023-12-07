@@ -368,15 +368,15 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
     is_on = command < baseline_cmd # Create logical mask for when command input is on
 
     num_rows = 3
-    num_cols = 4
+    num_cols = 3
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(16, 10))
     
-    def plot_subplots(ax,row,col,x,y,peakx,peaky,title):
+    def plot_subplots(ax,row,col,x,y,peakx,peaky,title,properties):
+        ax[row,col].scatter(peakx,peaky+5,marker="|",color='r',s=20)
         ax[row,col].plot(x,y,linewidth=1)
-        ax[row,col].scatter(peakx,peaky,color='r',s=1)
         ax[row,col].set_title(title)
 
-    positions = np.reshape(np.arange(12),(3,4))
+    positions = np.reshape(np.arange(num_cols*num_rows),(num_rows,num_cols))
 
     for sweep in range(d.numSweeps):
         current = getResponseDataSweep(d,sweep)
@@ -391,18 +391,21 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         
         # GET NUMBER OF ACTION POTENTIALS
         baseline_data = np.array(current[0:10]).mean() # get baseline data
-        peaks, prop = sig.find_peaks(moving_average(current,50),prominence=.5,height=(.3*(max(current)-min(current))+min(current)))
+        current_findpeak = current[stim_start:stim_end+500] # make sure to get the edges
+        time_findpeak = d.time[stim_start:stim_end+500]
+        peaks, prop = sig.find_peaks(moving_average(current_findpeak,20),prominence=(10,None),height=-20,width=(None,750))
 
         num_APs = len(peaks)
         save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/currentclamp_pngs/"
         
+        currentinj = command[stim_start+5]
 
         # add to the subplots
-        if sweep > 1 and sweep < 14:
+        if sweep > 1 and sweep < num_rows*num_cols:
             ax_idx = np.hstack(np.where(positions == sweep-2))
             row = ax_idx[0]
             col = ax_idx[1]
-            plot_subplots(axes,row,col,d.time,current,d.time[peaks],current[peaks],fn)
+            plot_subplots(axes,row,col,time_findpeak,current_findpeak,time_findpeak[peaks],current_findpeak[peaks],currentinj,prop)
 
         # print("NUM APS:",num_APs)
 
@@ -423,11 +426,11 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         # max_freq = 1/((AP_list[1] - AP_list[0]) * dt)
 
         mean_firing_frequency = mean_freq
-        currentinj = command[stim_start+5]
         # max_firing_frequency = max_freq
         all_avgs[sweep,:] = (sweep+1,currentinj,mean_firing_frequency)
     
     plt.savefig(join(save_path,str(fn)+'.png'))
+    plt.title(fn)
     plt.clf()
     plt.close()
     # plt.show()

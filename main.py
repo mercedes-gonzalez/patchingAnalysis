@@ -23,14 +23,14 @@ import pandas as pd
 from os import listdir
 from os.path import isfile, join
 import csv
-
+   
 # settings for plotting
 plt.rcParams.update({'font.size':10})
 
 # define file paths for grabbing and saving data
 abf_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/'
 save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/'
-main_filename = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/main-test.xlsx'
+main_filename = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/main/main18.xlsx'
 
 # reads .xlsx file with WC info and makes lists instead of just reading all .abfs in a folder.
 # then returns csvs for each file with passive params, firing params, and spike params
