@@ -261,7 +261,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             myData = abf2class(abf)
 
             # firing parameters
-            all_firing_params = pa.calc_freq(myData,base_fn)
+            all_firing_params = pa.calc_freq(myData,base_fn,save_path)
             save_firing_params_df = pd.DataFrame(all_firing_params,columns = ['sweep', 'current_inj', 'mean_firing_frequency'])
             save_firing_params_df.insert(0,"filename",base_fn)
             save_firing_params_df.insert(1,"membrane_capacitance",membrane_capacitance)

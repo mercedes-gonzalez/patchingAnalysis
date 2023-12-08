@@ -338,7 +338,7 @@ def calc_sag():
     sag_timing = sag_timing1
 '''
 
-def calc_freq(d,fn):     #calculate mean and max firing frequency
+def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
     # fn = int(fn)
     # d is a data object (custom defined class called data)
     dt = 1/d.sampleRate
@@ -393,12 +393,20 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
         baseline_data = np.array(current[0:10]).mean() # get baseline data
         current_findpeak = current[stim_start:stim_end+500] # make sure to get the edges
         time_findpeak = d.time[stim_start:stim_end+500]
-        peaks, prop = sig.find_peaks(moving_average(current_findpeak,20),prominence=(10,None),height=-20,width=(None,750))
+        # peaks, prop = sig.find_peaks(moving_average(current_findpeak,20),prominence=(10,None),height=-20,width=(None,100))
 
-        num_APs = len(peaks)
-        save_path = "/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/currentclamp_pngs/"
+        # num_APs = len(peaks)
         
         currentinj = command[stim_start+5]
+
+        for i in range(stim_start, stim_end):
+            if current[i] > -20:
+                if len(AP_list) > 0 and abs(AP_list[-1] - i) > 300: 
+                    AP_count += 1
+                    AP_list.append(i)
+                if len(AP_list) == 0:
+                    AP_count += 1
+                    AP_list.append(i)
 
         # add to the subplots
         if sweep > 1 and sweep < num_rows*num_cols:
@@ -407,20 +415,7 @@ def calc_freq(d,fn):     #calculate mean and max firing frequency
             col = ax_idx[1]
             plot_subplots(axes,row,col,time_findpeak,current_findpeak,time_findpeak[peaks],current_findpeak[peaks],currentinj,prop)
 
-        # print("NUM APS:",num_APs)
-
-
-
-#       Viktor's version??
-#         for i in range(stim_start, stim_end):
-#             if current[i] > -20:
-#                 if len(AP_list) > 0 and abs(AP_list[-1] - i) > 300: 
-#                     AP_count += 1
-#                     AP_list.append(i)
-#                 if len(AP_list) == 0:
-#                     AP_count += 1
-#                     AP_list.append(i)
-
+        print("NUM APS:",num_APs)
         mean_freq = num_APs / float(stim_length)
 
         # max_freq = 1/((AP_list[1] - AP_list[0]) * dt)

@@ -29,12 +29,12 @@ plt.rcParams.update({'font.size':10})
 
 # define file paths for grabbing and saving data
 abf_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/'
-save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/'
-main_filename = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/main/main18.xlsx'
+save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/testing/'
+main_filename = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/2023/main/main-test.xlsx'
 
 # reads .xlsx file with WC info and makes lists instead of just reading all .abfs in a folder.
 # then returns csvs for each file with passive params, firing params, and spike params
-# pABF.analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True)
+pABF.analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True)
 
 # reads the csvs generated above and creates figures
-gfig.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/")
+# gfig.makePatchStatsFigs("/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Fall 2023/")
