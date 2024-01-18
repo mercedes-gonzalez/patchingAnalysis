@@ -109,8 +109,12 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         mkdir(mt_path)
 
     svg_path = join(save_path,"svgs")
-    if not isdir(mt_path):
-        mkdir(mt_path)
+    if not isdir(svg_path):
+        mkdir(svg_path)
+
+    stats_path = join(save_path,"stats")
+    if not isdir(stats_path):
+        mkdir(stats_path)
     
     # read main.xlsx for all cell info
     df = pd.read_excel(main_filename,dtype=str)
@@ -120,9 +124,10 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         # generate full file name and path for the abf
         base_fn = cell.date_num + cell.MT1.zfill(3)
         print(base_fn)
+        year = cell.date[:4]
+
         if cell.MT1 != "na":
-            full_abf_name = join(abf_path, cell.date, base_fn + '.abf')
-            # print(full_abf_name)
+            full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
 
             # read into a myData class
             abf = pa.open_myabf(full_abf_name)
@@ -134,8 +139,10 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         # _____________________ passive parameters - FPC _____________________
         # generate full file name and path for the abf
         base_fn = cell.date_num + cell.FPC.zfill(3)
+        
+
         if cell.FPC != "na":
-            full_abf_name = join(abf_path, cell.date, base_fn + '.abf')
+            full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
 
             # read into a myData class
             abf = pa.open_myabf(full_abf_name)
@@ -177,7 +184,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         base_fn = cell.date_num + cell.FPC.zfill(3)
 
         if cell.FPC != "na":
-            full_abf_name = join(abf_path, cell.date, base_fn + '.abf')
+            full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
             # print(full_abf_name)
 
             # read into a myData class
@@ -185,7 +192,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             myData = abf2class(abf)
 
             # firing parameters
-            all_firing_params = pa.calc_freq(myData,base_fn)
+            all_firing_params = pa.calc_freq(myData,base_fn,cc_path)
             save_firing_params_df = pd.DataFrame(all_firing_params,columns = ['sweep', 'current_inj', 'mean_firing_frequency'])
             save_firing_params_df.insert(0,"filename",base_fn)
             save_firing_params_df.insert(1,"membrane_capacitance",membrane_capacitance)
@@ -205,7 +212,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
 
             save_firing_params_df.to_csv(join(firing_path,base_fn+'-firing_params-FPC.csv'),index=False)
 
-            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region]
+            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y]
 
             # individual spike params 
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,extension='-FPC')
@@ -215,7 +222,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         base_fn = cell.date_num + cell.FPU.zfill(3)
 
         if cell.FPU != "na":
-            full_abf_name = join(abf_path, cell.date, base_fn + '.abf')
+            full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
             # print(full_abf_name)
 
             # read into a myData class
@@ -253,7 +260,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         base_fn = cell.date_num + cell.FPU.zfill(3)
 
         if cell.FPU != "na":
-            full_abf_name = join(abf_path, cell.date, base_fn + '.abf')
+            full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
             # print(full_abf_name)
 
             # read into a myData class
@@ -261,7 +268,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             myData = abf2class(abf)
 
             # firing parameters
-            all_firing_params = pa.calc_freq(myData,base_fn,save_path)
+            all_firing_params = pa.calc_freq(myData,base_fn,cc_path)
             save_firing_params_df = pd.DataFrame(all_firing_params,columns = ['sweep', 'current_inj', 'mean_firing_frequency'])
             save_firing_params_df.insert(0,"filename",base_fn)
             save_firing_params_df.insert(1,"membrane_capacitance",membrane_capacitance)
@@ -281,7 +288,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 
             save_firing_params_df.to_csv(join(firing_path,base_fn+'-firing_params-FPU.csv'),index=False)
 
-            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region]
+            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y]
 
             # individual spike params 
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,extension='-FPU')

@@ -372,6 +372,9 @@ def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(16, 10))
     
     def plot_subplots(ax,row,col,x,y,peakx,peaky,title,properties):
+        # rowlab method only: 
+        peaky = np.ones_like(peaky)*60
+
         ax[row,col].scatter(peakx,peaky+5,marker="|",color='r',s=20)
         ax[row,col].plot(x,y,linewidth=1)
         ax[row,col].set_title(title)
@@ -383,6 +386,7 @@ def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
         command = getCommandSweep(d,sweep)
         AP_count = 0
         AP_list = []
+        peaks = []
 
         # GET COMMAND
         baseline_cmd = np.array(command[0:10]).mean() #get baseline command (no input)
@@ -393,20 +397,24 @@ def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
         baseline_data = np.array(current[0:10]).mean() # get baseline data
         current_findpeak = current[stim_start:stim_end+500] # make sure to get the edges
         time_findpeak = d.time[stim_start:stim_end+500]
-        # peaks, prop = sig.find_peaks(moving_average(current_findpeak,20),prominence=(10,None),height=-20,width=(None,100))
+        peaks, prop = sig.find_peaks(moving_average(current_findpeak,50),prominence=(10,None),height=(.2*(max(current)-min(current))+min(current)),width=(None,750)) # new method
+        # peaks, prop = sig.find_peaks(moving_average(current_findpeak,50),prominence=.5,height=(.3*(max(current)-min(current))+min(current))) # sfn find peaks method
 
-        # num_APs = len(peaks)
-        
         currentinj = command[stim_start+5]
 
-        for i in range(stim_start, stim_end):
-            if current[i] > -20:
-                if len(AP_list) > 0 and abs(AP_list[-1] - i) > 300: 
-                    AP_count += 1
-                    AP_list.append(i)
-                if len(AP_list) == 0:
-                    AP_count += 1
-                    AP_list.append(i)
+        # rowlab version
+        # prop = None
+        # for i in range(len(current_findpeak)):
+        #     if current_findpeak[i] > -20:
+        #         if len(AP_list) > 0 and abs(AP_list[-1] - i) > 300: 
+        #             AP_count += 1
+        #             AP_list.append(i)
+        #         if len(AP_list) == 0:
+        #             AP_count += 1
+        #             AP_list.append(i)
+        # peaks = AP_list
+        
+        num_APs = len(peaks)
 
         # add to the subplots
         if sweep > 1 and sweep < num_rows*num_cols:
@@ -415,7 +423,7 @@ def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
             col = ax_idx[1]
             plot_subplots(axes,row,col,time_findpeak,current_findpeak,time_findpeak[peaks],current_findpeak[peaks],currentinj,prop)
 
-        print("NUM APS:",num_APs)
+        # print("NUM APS:",num_APs)
         mean_freq = num_APs / float(stim_length)
 
         # max_freq = 1/((AP_list[1] - AP_list[0]) * dt)
@@ -534,6 +542,8 @@ def calc_all_spike_params(d,filename,save_path,sshcr,extension):
         "hemisphere" + "," +
         "cell_type" + "," +
         "region" + "," +
+        "X" + "," +
+        "Y" + "," +
         "sweep" + "," +
         "pA/pF" + "," +
         "current inj" + "," +
@@ -609,6 +619,8 @@ def calc_all_spike_params(d,filename,save_path,sshcr,extension):
                         sshcr[2] + "," +
                         sshcr[3] + ',' +
                         sshcr[4] + ',' +
+                        sshcr[5] + ',' +
+                        sshcr[6] + ',' +
                         str(sweep + 1) + "," +
                         str(papf) + "," +
                         str(currentinj) + "," +
