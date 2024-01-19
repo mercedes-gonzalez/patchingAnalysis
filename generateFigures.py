@@ -25,6 +25,7 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from scipy.stats import shapiro, ttest_ind
 import statistics 
+from statannotations.Annotator import Annotator
 
 def makePatchStatsFigs(save_path):
     region_list = ['EC','mPFC','V1']
@@ -55,7 +56,7 @@ def generateRegionFigs(save_path,brain_region):
     else: 
         filter_string = '-all'
     
-    if 1: # run this to plot current vs firing freq
+    if 0: # run this to plot current vs firing freq
         alldata = pd.read_csv(join(csv_path,'compiled_firing_freq-FPC.csv'))
         alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
 
@@ -234,7 +235,6 @@ def generateRegionFigs(save_path,brain_region):
         if filter_layers:
             alldata = alldata[alldata[distvar] > threshold]
 
-
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group,metric):
             threshold = 10 # Z-score threshold, you can adjust this based on your data
@@ -281,42 +281,7 @@ def generateRegionFigs(save_path,brain_region):
         # print("hAPP :",len(avgdata[avgdata['strain']=='hAPPKI']))
         # print("B6 :",len(avgdata[avgdata['strain']=='B6']))
 
-        PROPS = setProps('black')
-        fig2, axs2 = plt.subplots(ncols=4)
-        fig2.set_size_inches(10,3)
-        w = .2
-        ms = 4
-        huestr = "strain"
-        palstr = ['k','royalblue']
-        plot_order = ["B6", "hAPPKI"]
-
-        sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3], order = plot_order)
-        sns.swarmplot(y="RMP",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[3],palette=palstr,size=ms, order = plot_order)
-        axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
-        axs2[3].set_ylim([-100,-20])
-
-        sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2], order = plot_order)
-        sns.swarmplot(y="membrane_tau",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[2],palette=palstr,size=ms, order = plot_order)
-        axs2[2].set(ylabel="tau (ms)",xlabel="")
-        axs2[2].set_ylim([0,50])
-
-        sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0], order = plot_order)
-        sns.swarmplot(y="input_resistance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[0],palette=palstr,size=ms, order = plot_order)
-        axs2[0].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
-        axs2[0].set_ylim([0,500])
-
-        sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1], order = plot_order)
-        sns.swarmplot(y="membrane_capacitance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[1],palette=palstr,size=ms, order = plot_order)
-        axs2[1].set(ylabel="membrane capacitance (pF)",xlabel="")
-        axs2[1].set_ylim([0,100])
-
-        for i in [0,1,2,3]:
-            axs2[i].get_legend().remove()
-        
-        plt.suptitle(brain_region + ': hAPP ('+ str(len(avgdata[avgdata['strain']=='hAPPKI'])) +'), B6 (' + str(len(avgdata[avgdata['strain']=='B6'])) +')')
-        plt.tight_layout()
-        plt.savefig(join(save_path,'svgs',brain_region + filter_string + cell_type + '-pas.svg'),dpi=300,format='svg')
-
+        # t test statistics
         pas_stats = []
         def unpairedTTest(avgdata,measured_metric):
             hAPP = avgdata[avgdata['strain']=='hAPPKI']
@@ -345,13 +310,80 @@ def generateRegionFigs(save_path,brain_region):
             writer.writerow(['metric','n (hAPP)','n (B6J)','stat','p-value'])
             writer.writerows(pas_stats)
 
+
+        # generate plots
+        PROPS = setProps('black')
+        fig2, axs2 = plt.subplots(ncols=4)
+        fig2.set_size_inches(10,3)
+        w = .2
+        ms = 4
+        huestr = "strain"
+        palstr = ['k','royalblue']
+        plot_order = ["B6", "hAPPKI"]
+
+        # def makeBoxplot(axs,data,PROPS)
+        #     sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3], order = plot_order)
+        #     sns.swarmplot(y="RMP",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[3],palette=palstr,size=ms, order = plot_order)
+        #     axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
+        #     axs2[3].set_ylim([-100,-20])
+
+        sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3], order = plot_order)
+        sns.swarmplot(y="RMP",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[3],palette=palstr,size=ms, order = plot_order)
+        axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
+        axs2[3].set_ylim([-100,-20])
+
+        sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2], order = plot_order)
+        sns.swarmplot(y="membrane_tau",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[2],palette=palstr,size=ms, order = plot_order)
+        axs2[2].set(ylabel="tau (ms)",xlabel="")
+        axs2[2].set_ylim([0,50])
+
+        sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0], order = plot_order)
+        sns.swarmplot(y="input_resistance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[0],palette=palstr,size=ms, order = plot_order)
+        axs2[0].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
+        axs2[0].set_ylim([0,500])
+
+        sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1], order = plot_order)
+        sns.swarmplot(y="membrane_capacitance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[1],palette=palstr,size=ms, order = plot_order)
+        axs2[1].set(ylabel="membrane capacitance (pF)",xlabel="")
+        axs2[1].set_ylim([0,100])
+
+        for i in [0,1,2,3]:
+            axs2[i].get_legend().remove()
+        
+        # set up annotator for p values to be plotted automatically
+        pairs = [
+            ('B6','hAPPKI')
+        ]
+        hue_plot_params = {
+            'data': avgdata,
+            'x': 'strain',
+            'y': 'membrane_tau',
+        }
+        # https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
+        # https://github.com/trevismd/statannotations/tree/master
+        # for info on how to use apply_and_annotate
+
+        annotator = Annotator(axs2[2], pairs, **hue_plot_params)
+        pvalues = [.0024293857] # put actual values here.
+        formatted_pvalues = [f'p={pvalue:.2g}' for pvalue in pvalues]
+        # annotator.configure(text_format="simple") # turn this on to show p <= 0.05 for instance
+        annotator.set_custom_annotations(formatted_pvalues)
+        annotator.annotate()
+        # annotator.configure(test='Mann-Whitney').apply_and_annotate() # use this to run the stats in the plotting
+
+
+        plt.suptitle(brain_region + ': hAPP ('+ str(len(avgdata[avgdata['strain']=='hAPPKI'])) +'), B6 (' + str(len(avgdata[avgdata['strain']=='B6'])) +')')
+        plt.tight_layout()
+        plt.savefig(join(save_path,'svgs',brain_region + filter_string + cell_type + '-pas.svg'),dpi=300,format='svg')
+
+
     if 1: # plot a boxplot for a spike params
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
         
         if filter_layers:
             alldata = alldata[alldata[distvar] > threshold]
 
-        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 4) & (alldata['cell_type'] == cell_type)& (alldata['region'] == brain_region)]
+        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 10) & (alldata['cell_type'] == cell_type)& (alldata['region'] == brain_region)]
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group,metric):
             threshold = 10  # Z-score threshold, you can adjust this based on your data
@@ -438,63 +470,54 @@ def generateRegionFigs(save_path,brain_region):
             writer.writerow(['metric','n (hAPP)','n (B6J)','stat','p-value'])
             writer.writerows(pas_stats)
 
-    if 1: # run this to plot ap peak vs ap num, not yet done 
+    if 0: # run this to plot ap peak vs ap num, not yet done 
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
-        print("all data: ",alldata)
-        # Function to remove outliers using the Z-score method for each group
-        # def remove_outliers(group):
-        #     threshold = 3  # Z-score threshold, you can adjust this based on your data
-        #     mean_firing_freq = np.mean(group['mean_firing_frequency'])
-        #     std_firing_freq = np.std(group['mean_firing_frequency'])
-        #     return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
+        alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
 
         # Removing outliers from the 'pA/pF' column for each current injection group
-        cleaned_df = alldata#.groupby('pA/pF').apply(remove_outliers).reset_index(drop=True)
-        # print('cleaned: ',len(cleaned_df))
-
-        # Print the DataFrame containing outliers
-        # outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
-        # print("Outliers:")
-        # print(len(outliers_df))
-
+        cleaned_df = alldata#.groupby('APnum').apply(remove_outliers).reset_index(drop=True)
+        
         xaxisstr = 'APnum'
-        selected_pApF = 4
-        selectdata = cleaned_df.loc[(cleaned_df['APnum'] <= 30) & (cleaned_df['APnum'] >= 1) & (cleaned_df['pA/pF'] == selected_pApF)]
-        hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPP')]
-        B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6J')]
+        yaxisstr = 'AP peak'
+
+        selectdata = cleaned_df.loc[(cleaned_df[xaxisstr] <= 30) & (cleaned_df[xaxisstr] >=0) & (cleaned_df['pA/pF'] == 10)]
+        hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPPKI')]
+        B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6')]
                                  
-        mean_firing_freq = hAPPdata.groupby(xaxisstr)['APnum'].mean()
-        sem_firing_freq = hAPPdata.groupby(xaxisstr)['APnum'].sem()
+        mean_firing_freq = hAPPdata.groupby(xaxisstr)[yaxisstr].mean()
+        sem_firing_freq = hAPPdata.groupby(xaxisstr)[yaxisstr].sem()
         current_injection_values_hAPP = mean_firing_freq.index.tolist()
         mean_values_hAPP = mean_firing_freq.values.tolist()
         sem_values_hAPP = sem_firing_freq.values.tolist()
 
-        mean_firing_freq = B6Jdata.groupby(xaxisstr)['APnum'].mean()
-        sem_firing_freq = B6Jdata.groupby(xaxisstr)['APnum'].sem()
+        mean_firing_freq = B6Jdata.groupby(xaxisstr)[yaxisstr].mean()
+        sem_firing_freq = B6Jdata.groupby(xaxisstr)[yaxisstr].sem()
         current_injection_values_B6J = mean_firing_freq.index.tolist()
         mean_values_B6J = mean_firing_freq.values.tolist()
         sem_values_B6J = sem_firing_freq.values.tolist()
 
-
-        APnums0 = alldata[alldata['APnum']<21]
-        APnums = APnums0[APnums0['APnum'] > 0]
-        inj1 = APnums[APnums['pA/pF'] == 16]
-        inj2 = APnums[APnums['pA/pF'] == 20]
-        inj3 = APnums[APnums['pA/pF'] == 30]
+        # inj1 = APnums[APnums['pA/pF'] == 4]
+        # inj2 = APnums[APnums['pA/pF'] == 20]
+        # inj3 = APnums[APnums['pA/pF'] == 30]
+        # inj_list = [inj1,inj2,inj3]
 
         metric = "AP peak"
         PROPS = setProps('black')
         # Plotting the error bar plot
         lw = 2
         ms = 5
-
+        
         plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
+        
         plt.xlabel('AP Number')
         plt.ylabel('AP Peak (mV)')
-        plt.ylim([0,80])
-        plt.xlim([0,32])
+
+        plt.title(brain_region)
+        
+        # plt.ylim([0,40])
+        # plt.xlim([0,32])
         plt.legend(['hAPP','B6J'])
 
         plt.tight_layout()
-        plt.show()
+        plt.savefig(join(save_path,'svgs',brain_region+cell_type+'APpeak.svg'),dpi=300,format='svg')
