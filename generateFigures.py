@@ -321,56 +321,34 @@ def generateRegionFigs(save_path,brain_region):
         palstr = ['k','royalblue']
         plot_order = ["B6", "hAPPKI"]
 
-        # def makeBoxplot(axs,data,PROPS)
-        #     sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3], order = plot_order)
-        #     sns.swarmplot(y="RMP",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[3],palette=palstr,size=ms, order = plot_order)
-        #     axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
-        #     axs2[3].set_ylim([-100,-20])
+        def makeBoxplot(axs,data,metric,metric_str,axis_num,props):
+            sns.boxplot(y=metric,x="strain",data=data,**props,width=w,ax=axs[axis_num], order = plot_order)
+            sns.swarmplot(y=metric,x="strain",hue=huestr,data=data,zorder=.5,ax=axs[axis_num],palette=palstr,size=ms, order = plot_order)
+            axs[axis_num].set(ylabel=metric_str,xlabel="")
+            axs[axis_num].get_legend().remove()
+            #axs[axis_num].set_ylim([-100,-20])
 
-        sns.boxplot(y="RMP",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[3], order = plot_order)
-        sns.swarmplot(y="RMP",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[3],palette=palstr,size=ms, order = plot_order)
-        axs2[3].set(ylabel="resting membrane potential (mV)",xlabel="")
-        axs2[3].set_ylim([-100,-20])
+            # set up annotator for p values to be plotted automatically
+            # https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
+            # https://github.com/trevismd/statannotations/tree/master
 
-        sns.boxplot(y="membrane_tau",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[2], order = plot_order)
-        sns.swarmplot(y="membrane_tau",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[2],palette=palstr,size=ms, order = plot_order)
-        axs2[2].set(ylabel="tau (ms)",xlabel="")
-        axs2[2].set_ylim([0,50])
+            pairs = [('B6','hAPPKI')]
+            hue_plot_params = {'data': data, 'x': 'strain','y': metric,}
+            annotator = Annotator(axs[axis_num], pairs, **hue_plot_params)
+            pvalues = [.0024293857] # put actual values here.
+            formatted_pvalues = [f'p={pvalue:.2g}' for pvalue in pvalues]
+            annotator.set_custom_annotations(formatted_pvalues)
+            annotator.annotate()
+            
+            # annotator.configure(test='Mann-Whitney').apply_and_annotate() # use this to run the stats in the plotting
+            # annotator.configure(text_format="simple") # turn this on to show p <= 0.05 for instance
 
-        sns.boxplot(y="input_resistance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[0], order = plot_order)
-        sns.swarmplot(y="input_resistance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[0],palette=palstr,size=ms, order = plot_order)
-        axs2[0].set(ylabel="membrane resistance (M$\Omega$)",xlabel="")
-        axs2[0].set_ylim([0,500])
+            return
 
-        sns.boxplot(y="membrane_capacitance",x="strain",data=avgdata,**PROPS,width=w,ax=axs2[1], order = plot_order)
-        sns.swarmplot(y="membrane_capacitance",x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs2[1],palette=palstr,size=ms, order = plot_order)
-        axs2[1].set(ylabel="membrane capacitance (pF)",xlabel="")
-        axs2[1].set_ylim([0,100])
-
-        for i in [0,1,2,3]:
-            axs2[i].get_legend().remove()
-        
-        # set up annotator for p values to be plotted automatically
-        pairs = [
-            ('B6','hAPPKI')
-        ]
-        hue_plot_params = {
-            'data': avgdata,
-            'x': 'strain',
-            'y': 'membrane_tau',
-        }
-        # https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
-        # https://github.com/trevismd/statannotations/tree/master
-        # for info on how to use apply_and_annotate
-
-        annotator = Annotator(axs2[2], pairs, **hue_plot_params)
-        pvalues = [.0024293857] # put actual values here.
-        formatted_pvalues = [f'p={pvalue:.2g}' for pvalue in pvalues]
-        # annotator.configure(text_format="simple") # turn this on to show p <= 0.05 for instance
-        annotator.set_custom_annotations(formatted_pvalues)
-        annotator.annotate()
-        # annotator.configure(test='Mann-Whitney').apply_and_annotate() # use this to run the stats in the plotting
-
+        makeBoxplot(axs=axs2,data=avgdata,metric="RMP",metric_str="resting membrane potential (mV)",axis_num=0,props=PROPS)
+        makeBoxplot(axs=axs2,data=avgdata,metric="membrane_tau",metric_str="tau (ms)",axis_num=1,props=PROPS)
+        makeBoxplot(axs=axs2,data=avgdata,metric="input_resistance",metric_str="membrane resistance (M$\Omega$)",axis_num=2,props=PROPS)
+        makeBoxplot(axs=axs2,data=avgdata,metric="membrane_capacitance",metric_str="membrane capacitance (pF)",axis_num=3,props=PROPS)
 
         plt.suptitle(brain_region + ': hAPP ('+ str(len(avgdata[avgdata['strain']=='hAPPKI'])) +'), B6 (' + str(len(avgdata[avgdata['strain']=='B6'])) +')')
         plt.tight_layout()
