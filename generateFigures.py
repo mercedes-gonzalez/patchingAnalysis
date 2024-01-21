@@ -352,9 +352,8 @@ def generateRegionFigs(save_path,brain_region):
         fig.set_size_inches(10,3)
         w = .2
         ms = 4
-        huestr = "RMP"
-        # palstr = ['k','royalblue']
-        palstr = 'PiYG'
+        huestr = "strain"
+        palstr = ['k','royalblue']
         plot_order = ["B6", "hAPPKI"]
 
         makeBoxplot(metric="RMP",metric_str="resting membrane potential (mV)",axis_num=0,pvalues=[p_rmp])
@@ -425,9 +424,8 @@ def generateRegionFigs(save_path,brain_region):
         fig.set_size_inches(10,3)
         w = .2
 
-        huestr = "RMP"
-        # palstr = ['k','royalblue']
-        palstr = 'PiYG'
+        huestr = "strain"
+        palstr = ['k','royalblue']
         plot_order = ["B6", "hAPPKI"]
         
         ttest_result = unpairedTTest(cleaned_df,'AP peak')
