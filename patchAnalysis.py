@@ -545,14 +545,15 @@ def calc_all_spike_params(d,filename,save_path,sshcr,extension):
         "X" + "," +
         "Y" + "," +
         "sweep" + "," +
-        "pA/pF" + "," +
+        "pApF" + "," +
         "current inj" + "," +
         "APnum" + "," +
         "AP peak" + "," +
         "AP hwdt" + "," +
         "AHP" + ","+
         "threshold" + "," +
-        "dV/dt max" + '\n'
+        "dVdt max" + "," +
+        "RMP\n"
         )
     # d is a data object (custom defined class called data)
     dt = 1/d.sampleRate
@@ -629,7 +630,8 @@ def calc_all_spike_params(d,filename,save_path,sshcr,extension):
                         str(hwdt) + "," +
                         str(AHP1) + "," +
                         str(thresh) + "," +
-                        str(dvdt_max1) + '\n'
+                        str(dvdt_max1) + "," +
+                        str(sshcr[7]) + '\n'
                         )
                 
                 ap_counter += 1

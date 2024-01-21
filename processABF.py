@@ -155,7 +155,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             # Passive parameters 
             img_filename = join(save_path,"fit_pngs",base_fn + "-FPC")
             all_pas_params = pa.calc_pas_params(myData,img_filename,base_fn) # calculates passive properties of the cell
-            # membrane_capacitance = all_pas_params[2,2]
+            rmp = all_pas_params[2,3]
 
             save_pas_params_df = pd.DataFrame(all_pas_params,columns = ['membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'fit_err'])
             save_pas_params_df.insert(1,"MT-Cm",membrane_capacitance)
@@ -185,7 +185,6 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
 
         if cell.FPC != "na":
             full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
-            # print(full_abf_name)
 
             # read into a myData class
             abf = pa.open_myabf(full_abf_name)
@@ -209,10 +208,12 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 save_firing_params_df.insert(1,"cell_type",cell.cell_type)
                 save_firing_params_df.insert(0,"X",cell.X)
                 save_firing_params_df.insert(0,"Y",cell.Y)
+                save_firing_params_df.insert(0,"RMP",rmp)
+
 
             save_firing_params_df.to_csv(join(firing_path,base_fn+'-firing_params-FPC.csv'),index=False)
 
-            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y]
+            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y,rmp]
 
             # individual spike params 
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,extension='-FPC')
@@ -285,10 +286,12 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
                 save_firing_params_df.insert(0,"cell_type",cell.cell_type)
                 save_firing_params_df.insert(0,"X",cell.X)
                 save_firing_params_df.insert(0,"Y",cell.Y)
+                save_firing_params_df.insert(0,"RMP",rmp)
+                
                 
             save_firing_params_df.to_csv(join(firing_path,base_fn+'-firing_params-FPU.csv'),index=False)
 
-            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y]
+            sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y,rmp]
 
             # individual spike params 
             all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,extension='-FPU')
