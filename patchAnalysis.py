@@ -72,11 +72,11 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
             membrane_tau =  ((1 / t) / sampleRate) * 1e6 / abs(pas_stim)
             membrane_capacitance = membrane_tau / input_resistance *1000
         except:
-            m = .5
-            t = .5
-            b = .5
-            membrane_tau = .5
-            membrane_capacitance = .5
+            m = 'nan'
+            t = 'nan'
+            b = 'nan'
+            membrane_tau = 'nan'
+            membrane_capacitance = 'nan'
             print('failed to fit.')
 
         """
@@ -96,7 +96,10 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
         except:
             pass
         """
-
+        if membrane_capacitance > 500:
+            membrane_capacitance = 'nan'
+        if membrane_tau > 500: 
+            membrane_tau = 'nan'
         # find error in fit
         fit_err = np.average(abs((monoExp(d.time[passive_start:passive_end],m,t,b)-voltage_data[passive_start:passive_end])))
 
@@ -372,7 +375,6 @@ def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(16, 10))
     
     def plot_subplots(ax,row,col,x,y,peakx,peaky,title,properties):
-        # rowlab method only: 
         peaky = np.ones_like(peaky)*60
 
         ax[row,col].scatter(peakx,peaky+5,marker="|",color='r',s=20)
@@ -397,22 +399,9 @@ def calc_freq(d,fn,save_path):     #calculate mean and max firing frequency
         baseline_data = np.array(current[0:10]).mean() # get baseline data
         current_findpeak = current[stim_start:stim_end+500] # make sure to get the edges
         time_findpeak = d.time[stim_start:stim_end+500]
-        peaks, prop = sig.find_peaks(moving_average(current_findpeak,50),prominence=(10,None),height=(.2*(max(current)-min(current))+min(current)),width=(None,750)) # new method
-        # peaks, prop = sig.find_peaks(moving_average(current_findpeak,50),prominence=.5,height=(.3*(max(current)-min(current))+min(current))) # sfn find peaks method
+        peaks, prop = sig.find_peaks(moving_average(current_findpeak,50),prominence=(25,None),height=(.25*(max(current)-min(current))+min(current))) # new method
 
         currentinj = command[stim_start+5]
-
-        # rowlab version
-        # prop = None
-        # for i in range(len(current_findpeak)):
-        #     if current_findpeak[i] > -20:
-        #         if len(AP_list) > 0 and abs(AP_list[-1] - i) > 300: 
-        #             AP_count += 1
-        #             AP_list.append(i)
-        #         if len(AP_list) == 0:
-        #             AP_count += 1
-        #             AP_list.append(i)
-        # peaks = AP_list
         
         num_APs = len(peaks)
 
@@ -529,7 +518,7 @@ def spike_scaling():
     #return freq_list, curr_list
 '''
 
-def calc_all_spike_params(d,filename,save_path,sshcr,extension):
+def calc_all_spike_params(d,filename,save_path,sshcr,extension,correction):
     full_path = join(save_path,filename + extension)
     if exists(full_path+'.csv'):
         os.remove(full_path+'.csv')
@@ -570,73 +559,103 @@ def calc_all_spike_params(d,filename,save_path,sshcr,extension):
     for sweep in range(d.numSweeps):
         response = getResponseDataSweep(d,sweep) # mV
         command = getCommandSweep(d,sweep) # pA
+        
+        response_findpeak = response[stim_start:stim_end+500] # make sure to get the edges
+        time_findpeak = d.time[stim_start:stim_end+500]
 
-        # stim_start = stim_start - 1
-        stim_length = stim_end - stim_start
+        # peaks, prop = sig.find_peaks(moving_average(response_findpeak,50),prominence=(10,None),height=(.2*(max(response)-min(response))+min(response)),width=(None,750)) # old method
+        peaks, prop = sig.find_peaks(moving_average(response_findpeak,50),prominence=(25,None),height=(.25*(max(response)-min(response))+min(response))) # new method
+        prominences, baseL, baseR = sig.peak_prominences(moving_average(response_findpeak,50),peaks=peaks)
+        peaks = peaks - 5
 
-        threshat = 0
-        half2 = 0
-        flag_counter = 0
-        ap_counter = 0
+        for p,peak in enumerate(peaks):
+            peak_mv = response[stim_start + peak] # off by a little bit because of smoothing
+            if peak_mv > 100:
+                print("\tFilename: ",filename)
+                print("\tSweep: ",sweep)
+                print("\tAP num: ",p)
+                plt.figure()
+                plt.plot(d.time,response)
+                plt.scatter(d.time[stim_start+peak],peak_mv)
+                plt.show()
+                plt.clf()
+            
+            try:
+                window = .003 # this *2 = well outside the limits of the AP
+                st1 = int(stim_start + peak - (window / dt))
+                st2 = int(stim_start + peak + (window / dt))
 
-        for i in range(int(stim_length)):
-            if response[stim_start + i] > -20 and flag_counter > (0.002 / dt):
-                st1 = int(stim_start + i)                               #calc peak
-                st2 = int(stim_start + i + (0.002 / dt))
-                peak = np.max(response[st1 : st2])
-                peakat = np.argmax(response[st1 : st2]) + st1           
+                # halfwidth
+                half_peak_value = response[stim_start + peak]-(0.5*prominences[p])
+                thisAPonly = response[st1:st2]
+                crossing_indices = np.where(thisAPonly > half_peak_value)[0]
+                # plt.plot(thisAPonly[thisAPonly > half_peak_value])
+                # plt.show()
+                half_width_start = crossing_indices[0]
+                half_width_end = crossing_indices[-1]
+            except: 
+                window = .005 # this *2 = well outside the limits of the AP
+                st1 = int(stim_start + peak - (window / dt))
+                st2 = int(stim_start + peak + (window / dt))
 
-                dvdt = np.gradient(response, dt * 1000)                 #calculate dvdt_max
-                st1 = int(stim_start + i - (0.002 / dt))
-                st2 = int(stim_start + i + (0.002 / dt))
-                dvdt_max1 = np.max(dvdt[st1 : st2])
-
-                st1 = int(stim_start + i)                               #calculate threshold
-                for k in range(int(0.002 / dt)):
-                    if dvdt[st1 - k] < 50:
-                        thresh = response[st1 - k]
-                        threshat = st1 - k
-                        break
-
-                st1 = int(stim_start + i) 
-                st2 = int(stim_start + i + (0.006 / dt))                #calc AHP
-                AHP1 = abs(np.min(response[st1 : st2]) - thresh)
+                # halfwidth
+                print('peak: ',response[peak])
+                half_peak_value = 0.5 * response[peak]
+                thisAPonly = response[st1:st2]
+                crossing_indices = np.where(thisAPonly > half_peak_value)[0]
+                print('cross: ',crossing_indices)
+                half_width_start = crossing_indices[0]
+                half_width_end = crossing_indices[-1]
                 
-                half1 = (peakat - threshat) / 2 + threshat
-                st1 = peakat
-                st2 = peakat + int(0.002 / dt)
-                for i in range(st1,st2):
-                    if response[i] < response[int(half1)]:
-                        half2 = i
-                        break
-                hwdt = (half2 - half1) * dt *1000 
+            # Find the time points on both sides of the peak
+            hwdt = (half_width_end-half_width_start)*dt*1000
 
-                currentinj = command[stim_start+5]
-                papf = 2*sweep - 2
+            # dvdt max
+            dvdt = np.abs(np.gradient(response,dt * 1000))
+            dvdt_max = np.max(dvdt[st1 : st2])
 
-                f.write(filename + "," +
-                        sshcr[0] + "," +
-                        sshcr[1] + "," +
-                        sshcr[2] + "," +
-                        sshcr[3] + ',' +
-                        sshcr[4] + ',' +
-                        sshcr[5] + ',' +
-                        sshcr[6] + ',' +
-                        str(sweep + 1) + "," +
-                        str(papf) + "," +
-                        str(currentinj) + "," +
-                        str(ap_counter) + "," +
-                        str(peak) + "," +
-                        str(hwdt) + "," +
-                        str(AHP1) + "," +
-                        str(thresh) + "," +
-                        str(dvdt_max1) + "," +
-                        str(sshcr[7]) + '\n'
-                        )
-                
-                ap_counter += 1
-                flag_counter = 0
-            flag_counter += 1    
+            # threshold
+            checkthresh = dvdt[stim_start+peak-int(window/dt):stim_start+peak-int(window/10/dt)]
+            lt50 = np.where(checkthresh < 50)[0] # 50 is the cutoff for gradient
+            threshold_idx_relative = lt50[-1] # get the last one
+            threshold_mv = response[stim_start+peak-int(window/dt)+threshold_idx_relative]
+            threshold_idx = stim_start+peak-int(window/dt)+threshold_idx_relative
+            
+            # AHP
+            st1 = int(stim_start + peak) 
+            st2 = int(stim_start + peak + (0.006 / dt))                #calc AHP
+            AHP = abs(np.min(response[st1 : st2]) - threshold_mv)            
+
+            currentinj = command[stim_start+5]
+            
+            if correction == 2:
+                pApF = 2*sweep-4 #estimated during experiment
+            elif correction == 1:
+                pApF = sweep-2 #estimated during experiment
+
+            # papf = 2*sweep - 2
+            
+
+            f.write(filename + "," +
+                    sshcr[0] + "," +
+                    sshcr[1] + "," +
+                    sshcr[2] + "," +
+                    sshcr[3] + ',' +
+                    sshcr[4] + ',' +
+                    sshcr[5] + ',' +
+                    sshcr[6] + ',' +
+                    str(sweep + 1) + "," +
+                    str(pApF) + "," +
+                    str(currentinj) + "," +
+                    str(p) + "," +
+                    str(peak_mv) + "," +
+                    str(hwdt) + "," +
+                    str(AHP) + "," +
+                    str(threshold_mv) + "," +
+                    str(dvdt_max) + "," +
+                    str(sshcr[7]) + '\n'
+                    )
+
     f.close()
 
 '''

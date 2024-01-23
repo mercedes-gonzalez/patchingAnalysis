@@ -29,10 +29,13 @@ from statannotations.Annotator import Annotator
 
 def makePatchStatsFigs(save_path):
     region_list = ['EC','mPFC','V1']
-    for region in region_list:
-        generateRegionFigs(save_path,brain_region=region)
+    cell_types_list = ['pyramidal','interneuron']
 
-def generateRegionFigs(save_path,brain_region):  
+    for region in region_list:
+        for cell in cell_types_list:
+            generateRegionFigs(save_path,brain_region=region,cell_type=cell)
+
+def generateRegionFigs(save_path,brain_region,cell_type):  
     # plot formatting
     sns.set_theme(style="whitegrid")
     color = ['red','blue','green','gray']
@@ -46,8 +49,10 @@ def generateRegionFigs(save_path,brain_region):
         return PROPS
     
     distvar = 'Y'
-    cell_type = 'interneuron' # interneuron or pyramidal
     threshold = 20000
+    selected_pApF = 12
+    RMPmin = -80
+    RMPmax = -60
 
     csv_path = save_path
     filter_layers = 0
@@ -55,10 +60,11 @@ def generateRegionFigs(save_path,brain_region):
         filter_string = '-Y2000'
     else: 
         filter_string = '-all'
-    
-    if 0: # run this to plot current vs firing freq
+
+    if 1: # run this to plot current vs firing freq
         alldata = pd.read_csv(join(csv_path,'compiled_firing_freq-FPC.csv'))
         alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
+        alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
 
         if filter_layers:
             alldata = alldata[alldata[distvar] > threshold]
@@ -75,10 +81,14 @@ def generateRegionFigs(save_path,brain_region):
 
         # Print the DataFrame containing outliers
         outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
-        print("Outliers firing:",len(outliers_df))
 
         xaxisstr = 'est_pApF'
-        selectdata = cleaned_df.loc[(cleaned_df[xaxisstr] <= 30) & (cleaned_df[xaxisstr] >=0)]
+        if cell_type == 'interneuron':
+            max_papf = 30
+        elif cell_type == 'pyramidal':
+            max_papf = 20
+
+        selectdata = cleaned_df.loc[(cleaned_df[xaxisstr] <= max_papf) & (cleaned_df[xaxisstr] >=0) & (np.mod(cleaned_df[xaxisstr],2)==0)]
         hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPPKI')]
         B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6')]
                                  
@@ -109,17 +119,33 @@ def generateRegionFigs(save_path,brain_region):
         #     writer.writerow([xaxisstr,'strain','numSamples','SW-stat','p-value'])
         #     writer.writerows(stats)
         
-        # # _____________ ANOVA statistics just sex and strain ____________________-
-        # region_path = join(save_path,brain_region)
-        # if not isdir(region_path):
-        #     mkdir(region_path)
+        # _____________ ANOVA statistics just sex and strain ____________________-
+        region_path = join(save_path,brain_region)
+        if not isdir(region_path):
+            mkdir(region_path)
 
-        # unique_pApF_values = selectdata[xaxisstr].unique().tolist()
-        # for inj in unique_pApF_values: #get unique pApF and do the stats for each injection value
-        #     current_inj_df = selectdata.loc[(selectdata[xaxisstr] == inj)]
-        #     model = ols('mean_firing_frequency ~ C(strain)',data=current_inj_df).fit()
-        #     result = sm.stats.anova_lm(model,typ=2)
-        #     result.to_csv(join(save_path,brain_region,str(inj)+brain_region+'.csv'), index=True)
+        p_list = []
+        unique_pApF_values = selectdata[xaxisstr].unique().tolist()
+        for p,inj in enumerate(unique_pApF_values): #get unique pApF and do the stats for each injection value
+            current_inj_df = selectdata.loc[(selectdata[xaxisstr] == inj)]
+            model = ols('mean_firing_frequency ~ C(strain)',data=current_inj_df).fit()
+            result = sm.stats.anova_lm(model,typ=2)
+            result.to_csv(join(save_path,brain_region,str(inj)+brain_region+'.csv'), index=True)
+            pvalue = result.loc['C(strain)', 'PR(>F)']
+
+            if pvalue >= .05:
+                p_list.append(" ")
+            elif pvalue < 0.05:
+                p_list.append("*")
+            # elif pvalue > 0.01:
+            #     p_list.append("*")
+            # elif pvalue > 0.001:
+            #     p_list.append("**")
+            # elif pvalue > 0.0001:
+            #     p_list.append("***")
+            # else:
+            #     p_list.append("****")
+
 
         # # ___________________ hAPP vs B6 stats _________________________
         # stats = []
@@ -135,6 +161,7 @@ def generateRegionFigs(save_path,brain_region):
         #     writer.writerow(['strain','current_inj','numSamples','SW-stat','p-value'])
         #     writer.writerows(stats)
         # _______________________________________________________________
+
         if 0: 
             plt.figure()
             plt.scatter(pd.to_numeric(hAPPdata['X']),pd.to_numeric(hAPPdata['Y']))
@@ -174,19 +201,32 @@ def generateRegionFigs(save_path,brain_region):
             plt.colorbar(label=distvar)
             plt.show()
     
+        # Plotting the error bar plot
         fig, axs = plt.subplots()
         fig.set_size_inches(4,4)
         
-        # Plotting the error bar plot
         lw = 2
         ms = 5
-
         plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
         plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
+        
+        positions1 = np.array(mean_values_hAPP) + np.array(sem_values_hAPP)
+        positions2 = np.array(mean_values_B6J) + np.array(sem_values_B6J)
+        positions = np.maximum(positions1,positions2)
+
+        # plot p value indicators
+        for i, label in enumerate(p_list):
+            plt.annotate(label,(unique_pApF_values[i],positions[i]),xytext=(0,10),textcoords="offset points", ha='center')
+        
         plt.xlabel('Current Injection (pApF)')
         plt.ylabel('Mean Firing Frequency (Hz)')
-        plt.ylim([0,250])
-        plt.xlim([0,32])
+
+        if brain_region == 'interneuron':
+            plt.ylim([0,250])
+        elif brain_region == 'pyramidal':
+            plt.ylim([0,100])
+
+        plt.xlim([0,max_papf+2])
         plt.legend(['hAPP','B6J'])
 
         try:
@@ -195,6 +235,7 @@ def generateRegionFigs(save_path,brain_region):
             print('no title')
         plt.tight_layout()
         plt.savefig(join(save_path,'svgs',brain_region+cell_type+'firing.svg'),dpi=300,format='svg')
+        plt.clf()
 
         if 0:
             # normality violin plots - one plot with B6 vs hAPP
@@ -228,6 +269,11 @@ def generateRegionFigs(save_path,brain_region):
 
 
     if 1: # plot a boxplot for a passive param
+        alldata = pd.read_csv(join(csv_path,'compiled_pas_params-FPC.csv'))
+        alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
+        alldata = alldata.loc[(alldata['MT-celltau'] > 0) & (alldata['MT-Rm'] >0)]
+        alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
+
         # ___________________________ SUBFUNCTIONS _______________________________
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group,metric):
@@ -248,13 +294,23 @@ def generateRegionFigs(save_path,brain_region):
             nGroup2 = len(group2)
 
             return [measured_metric,nGroup1,nGroup2,stat,pvalue]
+
+        def unpairedTTestAPPeak(avgdata,measured_metric):
+            hAPP = avgdata[avgdata['strain']=='hAPPKI']
+            B6J = avgdata[avgdata['strain']=='B6']
+
+            group1 = hAPP[measured_metric]
+            group2 = B6J[measured_metric]
+
+            stat, pvalue = ttest_ind(group1,group2,equal_var = 0)
+
+            return pvalue
         
         def makeBoxplot(metric,metric_str,axis_num,pvalues):
             sns.boxplot(y=metric,x="strain",data=avgdata,**PROPS,width=w,ax=axs[axis_num], order = plot_order)
             sns.swarmplot(y=metric,x="strain",hue=huestr,data=avgdata,zorder=.5,ax=axs[axis_num],palette=palstr,size=ms, order = plot_order)
             axs[axis_num].set(ylabel=metric_str,xlabel="")
             axs[axis_num].get_legend().remove()
-            #axs[axis_num].set_ylim([-100,-20])
 
             # set up annotator for p values to be plotted automatically
             # https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
@@ -267,14 +323,8 @@ def generateRegionFigs(save_path,brain_region):
             annotator.set_custom_annotations(formatted_pvalues)
             annotator.annotate()
 
-            # annotator.configure(test='Mann-Whitney').apply_and_annotate() # use this to run the stats in the plotting
-            # annotator.configure(text_format="simple") # turn this on to show p <= 0.05 for instance
             return
         # ________________________________________________________________________
-
-        alldata = pd.read_csv(join(csv_path,'compiled_pas_params-FPC.csv'))
-        alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
-        alldata = alldata.loc[(alldata['MT-celltau'] > 0) & (alldata['MT-celltau'] < 85)& (alldata['MT-Rm'] >0)& (alldata['RMP'] >-80)& (alldata['RMP'] <-60)]
 
         if filter_layers:
             alldata = alldata[alldata[distvar] > threshold]
@@ -300,19 +350,19 @@ def generateRegionFigs(save_path,brain_region):
             hemisphere = fn_df.iat[0,4]
 
             tau_list = np.array(pd.unique(fn_df['membrane_tau']))
-            tau = np.median(tau_list)
+            tau = np.nanmedian(tau_list)
 
             cap_list = np.array(pd.unique(fn_df['membrane_capacitance']))
-            capacitance = np.median(cap_list)
+            capacitance = np.nanmedian(cap_list)
 
             in_rest_list = np.array(pd.unique(fn_df['input_resistance']))
-            input_resistance = np.median(in_rest_list)
+            input_resistance = np.nanmedian(in_rest_list)
 
             rmp_list = np.array(pd.unique(fn_df['RMP']))
-            rmp = np.median(rmp_list)
+            rmp = np.nanmean(rmp_list)
 
             holding_list = np.array(pd.unique(fn_df['MT-holding']))
-            holding = np.median(holding_list)
+            holding = np.nanmedian(holding_list)
 
             avg_params.append([fn,strain,sex,hemisphere,tau,capacitance,input_resistance,rmp,holding])
 
@@ -365,16 +415,20 @@ def generateRegionFigs(save_path,brain_region):
         plt.suptitle(brain_region + ': hAPP ('+ str(len(avgdata[avgdata['strain']=='hAPPKI'])) +'), B6 (' + str(len(avgdata[avgdata['strain']=='B6'])) +')')
         plt.tight_layout()
         plt.savefig(join(save_path,'svgs',brain_region + filter_string + cell_type + '-pas.svg'),dpi=300,format='svg')
-
+        plt.clf()
 
     if 1: # plot a boxplot for a spike params
+        alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
+        alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
+        alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
+
+
         # ___________________________ SUBFUNCTIONS _______________________________
-        def makeBoxplot(metric,metric_str,data,axis_num,pvalues):
+        def makeBoxplotSpikeParams(metric,metric_str,data,axis_num,pvalues):
             sns.boxplot(y=metric,x="strain",data=data,**PROPS,width=w,ax=axs[axis_num], order = plot_order)
             sns.swarmplot(y=metric,x="strain",hue=huestr,data=data,zorder=.5,ax=axs[axis_num],palette=palstr,size=ms, order = plot_order)
             axs[axis_num].set(ylabel=metric_str,xlabel="")
             axs[axis_num].get_legend().remove()
-            #axs[axis_num].set_ylim([-100,-20])
 
             # set up annotator for p values to be plotted automatically
             # https://levelup.gitconnected.com/statistics-on-seaborn-plots-with-statannotations-2bfce0394c00
@@ -387,27 +441,23 @@ def generateRegionFigs(save_path,brain_region):
             annotator.set_custom_annotations(formatted_pvalues)
             annotator.annotate()
 
-            # annotator.configure(test='Mann-Whitney').apply_and_annotate() # use this to run the stats in the plotting
-            # annotator.configure(text_format="simple") # turn this on to show p <= 0.05 for instance
-
             return
-
-
-        # ________________________________________________________________________
-
-
-        alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
         
-        if filter_layers:
-            alldata = alldata[alldata[distvar] > threshold]
-
-        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['sweep'] == 4) & (alldata['cell_type'] == cell_type)& (alldata['region'] == brain_region)]
         # Function to remove outliers using the Z-score method for each group
         def remove_outliers(group,metric):
-            threshold = 3  # Z-score threshold, you can adjust this based on your data
+            threshold = 10  # Z-score threshold, you can adjust this based on your data
             mean_firing_freq = np.mean(group[metric])
             std_firing_freq = np.std(group[metric])
             return group[abs(group[metric] - mean_firing_freq) < threshold * std_firing_freq]
+
+        # ________________________________________________________________________
+
+        alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
+
+        if filter_layers:
+            alldata = alldata[alldata[distvar] > threshold]
+
+        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['pApF'] == selected_pApF) & (alldata['cell_type'] == cell_type)& (alldata['region'] == brain_region)]
 
         metrics = ['AHP','threshold','dVdt max','AP peak','AP hwdt']
 
@@ -417,7 +467,6 @@ def generateRegionFigs(save_path,brain_region):
 
         # Print the DataFrame containing outliers
         outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
-        print("Outliers spike:",len(outliers_df))
         
         PROPS = setProps('black')
         fig, axs = plt.subplots(ncols=5)#,nrows=2)
@@ -448,33 +497,37 @@ def generateRegionFigs(save_path,brain_region):
         p_ahp = ttest_result[4]
         pas_stats.append(ttest_result)
 
-        makeBoxplot(metric="AP peak",metric_str="AP Peak (mV)",data=cleaned_df,axis_num=0,pvalues=[p_peak])
-        makeBoxplot(metric="AP hwdt",metric_str="AP hwdt (ms)",data=cleaned_df,axis_num=1,pvalues=[p_hwdt])
-        makeBoxplot(metric="threshold",metric_str="threshold (mV)",data=cleaned_df,axis_num=2,pvalues=[p_threshold])
-        makeBoxplot(metric="dVdt max",metric_str="dV/dt max (mV/s)",data=cleaned_df,axis_num=3,pvalues=[p_dvdt])
-        makeBoxplot(metric="AHP",metric_str="AHP",data=cleaned_df,axis_num=4,pvalues=[p_ahp])
+        makeBoxplotSpikeParams(metric="AP peak",metric_str="AP Peak (mV)",data=cleaned_df,axis_num=0,pvalues=[p_peak])
+        makeBoxplotSpikeParams(metric="AP hwdt",metric_str="AP hwdt (ms)",data=cleaned_df,axis_num=1,pvalues=[p_hwdt])
+        makeBoxplotSpikeParams(metric="threshold",metric_str="threshold (mV)",data=cleaned_df,axis_num=2,pvalues=[p_threshold])
+        makeBoxplotSpikeParams(metric="dVdt max",metric_str="dV/dt max (mV/s)",data=cleaned_df,axis_num=3,pvalues=[p_dvdt])
+        makeBoxplotSpikeParams(metric="AHP",metric_str="AHP",data=cleaned_df,axis_num=4,pvalues=[p_ahp])
 
         plt.suptitle(brain_region + ': hAPP ('+ str(len(cleaned_df[cleaned_df['strain']=='hAPPKI'])) +'), B6 (' + str(len(cleaned_df[cleaned_df['strain']=='B6'])) +')')
         plt.tight_layout()
         plt.savefig(join(save_path,'svgs',brain_region+filter_string+cell_type+'-spike.svg'),dpi=300,format='svg')
-        
+        plt.clf()
+
         with open(join(save_path,"stats","spike_stats_"+brain_region+filter_string+cell_type+".csv"), "w") as f:
             writer = csv.writer(f)
             writer.writerow(['metric','n (hAPP)','n (B6J)','stat','p-value'])
             writer.writerows(pas_stats)
     
 
-    if 0: # run this to plot ap peak vs ap num
+    if 1: # run this to plot ap peak vs ap num
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
         alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
+        alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
+
 
         # Removing outliers from the 'pApF' column for each current injection group
         cleaned_df = alldata#.groupby('APnum').apply(remove_outliers).reset_index(drop=True)
         
-        xaxisstr = 'APnum'
-        yaxisstr = 'AP peak'
+        xaxisstr = 'APnum' # independent variable, with strain too
+        yaxisstr = 'AP peak' # dependent variable
 
-        selectdata = cleaned_df.loc[(cleaned_df[xaxisstr] <= 30) & (cleaned_df[xaxisstr] >=0) & (cleaned_df['pApF'] == 10)]
+        xlimit = 30
+        selectdata = cleaned_df.loc[(cleaned_df[xaxisstr] <= xlimit) & (cleaned_df[xaxisstr] >=0) & (cleaned_df['pApF'] == selected_pApF)]
         hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPPKI')]
         B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6')]
                                  
@@ -490,28 +543,48 @@ def generateRegionFigs(save_path,brain_region):
         mean_values_B6J = mean_firing_freq.values.tolist()
         sem_values_B6J = sem_firing_freq.values.tolist()
 
-        # inj1 = APnums[APnums['pApF'] == 4]
-        # inj2 = APnums[APnums['pApF'] == 20]
-        # inj3 = APnums[APnums['pApF'] == 30]
-        # inj_list = [inj1,inj2,inj3]
+        # stats
+        result = cleaned_df.groupby(xaxisstr).apply(lambda x: unpairedTTestAPPeak(x,yaxisstr))        
 
         metric = "AP peak"
         PROPS = setProps('black')
+
         # Plotting the error bar plot
+        fig, axs = plt.subplots()
+        fig.set_size_inches(4,4)
+
         lw = 2
         ms = 5
         
-        plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
-        plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
+        plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white',label='hAPPKI')
+        plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white',label='B6')
+
+        # plot p value indicators
+        pvalues = result.values[:xlimit]
+        p_list = []
+
+        for pvalue in pvalues:
+            if pvalue >= .05:
+                p_list.append(" ")
+            elif pvalue < 0.05:
+                p_list.append("*")
         
+        positions1 = np.array(mean_values_hAPP) + np.array(sem_values_hAPP)
+        positions2 = np.array(mean_values_B6J) + np.array(sem_values_B6J)
+        positions = np.maximum(positions1,positions2)
+
+
+        for i, label in enumerate(p_list):
+            plt.annotate(label,(current_injection_values_hAPP[i],positions[i]),xytext=(0,5),textcoords="offset points", ha='center')
+        
+
         plt.xlabel('AP Number')
         plt.ylabel('AP Peak (mV)')
 
         plt.title(brain_region)
-        
-        # plt.ylim([0,40])
-        # plt.xlim([0,32])
-        plt.legend(['hAPP','B6J'])
+
+        plt.legend()
 
         plt.tight_layout()
-        plt.savefig(join(save_path,'svgs',brain_region+cell_type+'APpeak.svg'),dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region+'-'+cell_type+'-APpeak.svg'),dpi=300,format='svg')
+        plt.clf()

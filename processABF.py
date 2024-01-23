@@ -123,7 +123,6 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         # # _____________________ MEMTEST _____________________
         # generate full file name and path for the abf
         base_fn = cell.date_num + cell.MT1.zfill(3)
-        print(base_fn)
         year = cell.date[:4]
 
         if cell.MT1 != "na":
@@ -139,8 +138,6 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         # _____________________ passive parameters - FPC _____________________
         # generate full file name and path for the abf
         base_fn = cell.date_num + cell.FPC.zfill(3)
-        
-
         if cell.FPC != "na":
             full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
 
@@ -195,11 +192,21 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             save_firing_params_df = pd.DataFrame(all_firing_params,columns = ['sweep', 'current_inj', 'mean_firing_frequency'])
             save_firing_params_df.insert(0,"filename",base_fn)
             save_firing_params_df.insert(1,"membrane_capacitance",membrane_capacitance)
-            save_firing_params_df.insert(1,"est_pA/pF",2*save_firing_params_df['sweep']-4) #estimated during experiment
-            save_firing_params_df.insert(1,"calculated_pA/pF",save_firing_params_df['current_inj']/save_firing_params_df['membrane_capacitance']) #actually calculated
-            save_firing_params_df.insert(1,"plot_pA/pF",round(save_firing_params_df['calculated_pA/pF'] / 2) * 2) # actually calculated
-            save_firing_params_df.insert(1,"rounded_pA/pF",round(save_firing_params_df['calculated_pA/pF'])) # rounded only, based on calculated
-            
+            save_firing_params_df.insert(1,"calculated_pApF",save_firing_params_df['current_inj']/save_firing_params_df['membrane_capacitance']) #actually calculated
+
+            # calculate whether the input was 1x or 2x pA/pF
+            sweep_nums = all_firing_params[:,0]
+            current_inj = all_firing_params[:,1]
+            calculated_pApF = current_inj/membrane_capacitance
+            est_pApF = 2*sweep_nums - 4
+            diff_metric = (est_pApF[-1]-est_pApF[0]) / (calculated_pApF[-1]-calculated_pApF[0])
+            if diff_metric > 0.5:
+                save_firing_params_df.insert(1,"est_pApF",2*save_firing_params_df['sweep']-4) #estimated during experiment
+                correction = 2
+            else: # diff metric < 0.5 
+                save_firing_params_df.insert(1,"est_pApF",save_firing_params_df['sweep']-2) #estimated during experiment
+                correction = 1
+
             if brainslice: 
                 save_firing_params_df.insert(1,"strain",cell.strain)
                 save_firing_params_df.insert(1,"sex",cell.sex)
@@ -216,13 +223,14 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y,rmp]
 
             # individual spike params 
-            all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,extension='-FPC')
+            pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,correction=correction,extension='-FPC')
 
         # _____________________ passive params - FPU _____________________
                 # generate full file name and path for the abf
         base_fn = cell.date_num + cell.FPU.zfill(3)
 
         if cell.FPU != "na":
+
             full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
             # print(full_abf_name)
 
@@ -261,6 +269,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         base_fn = cell.date_num + cell.FPU.zfill(3)
 
         if cell.FPU != "na":
+
             full_abf_name = join(abf_path, year, cell.date, base_fn + '.abf')
             # print(full_abf_name)
 
@@ -273,10 +282,20 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             save_firing_params_df = pd.DataFrame(all_firing_params,columns = ['sweep', 'current_inj', 'mean_firing_frequency'])
             save_firing_params_df.insert(0,"filename",base_fn)
             save_firing_params_df.insert(1,"membrane_capacitance",membrane_capacitance)
-            save_firing_params_df.insert(1,"est_pA/pF",2*save_firing_params_df['sweep']-4) #estimated
-            save_firing_params_df.insert(1,"calculated_pA/pF",save_firing_params_df['current_inj']/save_firing_params_df['membrane_capacitance']) #actually calculated
-            save_firing_params_df.insert(1,"plot_pA/pF",round(save_firing_params_df['calculated_pA/pF'] / 2) * 2) #actually calculated
-            save_firing_params_df.insert(1,"rounded_pA/pF",round(save_firing_params_df['calculated_pA/pF'])) # rounded only, based on calculated
+            save_firing_params_df.insert(1,"calculated_pApF",save_firing_params_df['current_inj']/save_firing_params_df['membrane_capacitance']) #actually calculated
+
+            # calculate whether the input was 1x or 2x pA/pF
+            sweep_nums = all_firing_params[:,0]
+            current_inj = all_firing_params[:,1]
+            calculated_pApF = current_inj/membrane_capacitance
+            est_pApF = 2*sweep_nums - 4
+            diff_metric = (est_pApF[-1]-est_pApF[0]) / (calculated_pApF[-1]-calculated_pApF[0])
+            if diff_metric > 0.5:
+                save_firing_params_df.insert(1,"est_pApF",2*save_firing_params_df['sweep']-4) #estimated during experiment
+                correction = 2 # 2pA/pF
+            else: # diff metric < 0.5 
+                save_firing_params_df.insert(1,"est_pApF",save_firing_params_df['sweep']-2) #estimated during experiment
+                correction = 1 #1 pA/pF
 
             if brainslice: 
                 save_firing_params_df.insert(1,"strain",cell.strain)
@@ -294,7 +313,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             sshcr = [cell.strain, cell.sex, cell.hemisphere, cell.cell_type,cell.region,cell.X,cell.Y,rmp]
 
             # individual spike params 
-            all_spike_params = pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,extension='-FPU')
+            pa.calc_all_spike_params(myData,base_fn,spike_path,sshcr,correction=correction,extension='-FPU')
 
         membrane_resistance = 0.001
         membrane_capacitance = 0.001
@@ -310,14 +329,14 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         firing_csv_list = [join(firing_path,f) for f in listdir(firing_path) if isfile(join(firing_path, f)) and f.endswith("-FPC.csv")]
         spike_csv_list = [join(spike_path,f) for f in listdir(spike_path) if isfile(join(spike_path, f)) and f.endswith("-FPC.csv")]
 
-        print('pas: ',pas_csv_list)
-        print('firing: ',firing_csv_list)
-        print('spike: ',spike_csv_list)
+        # print('pas: ',pas_csv_list)
+        # print('firing: ',firing_csv_list)
+        # print('spike: ',spike_csv_list)
         df = pd.concat(map(pd.read_csv,spike_csv_list),ignore_index=True)
         df.to_csv(join(save_path,'compiled_spike_params-FPC.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
-        df.insert(5,"pApF",round(df["calculated_pA/pF"]/2)*2)
+        df.insert(5,"pApF",round(df["calculated_pApF"]/2)*2)
         df.to_csv(join(save_path,'compiled_firing_freq-FPC.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
@@ -332,8 +351,10 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         df.to_csv(join(save_path,'compiled_spike_params-FPU.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
-        df.insert(5,"pApF",round(df["calculated_pA/pF"]/2)*2)
+        df.insert(5,"pApF",round(df["calculated_pApF"]/2)*2)
         df.to_csv(join(save_path,'compiled_firing_freq-FPU.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
         df.to_csv(join(save_path,'compiled_pas_params-FPU.csv'),index=False)
+
+        print('\n\n\n ******* \n\n DONE PROCESSING \n\n ******* \n\n\n')
