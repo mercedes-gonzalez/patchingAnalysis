@@ -36,6 +36,20 @@ def makePatchStatsFigs(save_path):
             generateRegionFigs(save_path,brain_region=region,cell_type=cell)
 
 def generateRegionFigs(save_path,brain_region,cell_type):  
+    # Function to remove outliers using the Z-score method for each group
+    def removeOutliers(group,metric):
+        mean_firing_freq = np.mean(group[metric])
+        std_firing_freq = np.std(group[metric])
+        return group[abs(group[metric] - mean_firing_freq) < zthreshold * std_firing_freq]
+
+    # Function to remove outliers using the Z-score method for each group
+    def removeOutliersPeak(group,metric):
+        mean_firing_freq = np.mean(group[metric])
+        std_firing_freq = np.std(group[metric])
+        return group[abs(group[metric] - mean_firing_freq) < zthreshold * std_firing_freq]
+    
+
+
     # plot formatting
     sns.set_theme(style="whitegrid")
     color = ['red','blue','green','gray']
@@ -50,9 +64,10 @@ def generateRegionFigs(save_path,brain_region,cell_type):
     
     distvar = 'Y'
     threshold = 20000
-    selected_pApF = 12
-    RMPmin = -80
-    RMPmax = -60
+    selected_pApF = 10
+    RMPmin = -100
+    RMPmax = 100
+    zthreshold = 3 # Z-score threshold, you can adjust this based on your data
 
     csv_path = save_path
     filter_layers = 0
@@ -69,15 +84,8 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         if filter_layers:
             alldata = alldata[alldata[distvar] > threshold]
 
-        # Function to remove outliers using the Z-score method for each group
-        def remove_outliers(group):
-            threshold = 10 # Z-score threshold, you can adjust this based on your data
-            mean_firing_freq = np.mean(group['mean_firing_frequency'])
-            std_firing_freq = np.std(group['mean_firing_frequency'])
-            return group[abs(group['mean_firing_frequency'] - mean_firing_freq) < threshold * std_firing_freq]
-
         # Removing outliers from the 'pApF' column for each current injection group
-        cleaned_df = alldata#.groupby('plot_pApF').apply(remove_outliers).reset_index(drop=True)
+        cleaned_df = alldata.groupby('est_pApF').apply(lambda x: removeOutliers(x, 'mean_firing_frequency')).reset_index(drop=True)
 
         # Print the DataFrame containing outliers
         outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
@@ -212,6 +220,11 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         
         positions1 = np.array(mean_values_hAPP) + np.array(sem_values_hAPP)
         positions2 = np.array(mean_values_B6J) + np.array(sem_values_B6J)
+
+        if len(positions1) > len(positions2):
+            positions2 = np.append(positions2,np.zeros((len(positions1) - len(positions2))))
+        elif len(positions1) < len(positions2):
+            positions1 = np.append(positions1,np.zeros((len(positions2) - len(positions1))))
         positions = np.maximum(positions1,positions2)
 
         # plot p value indicators
@@ -275,13 +288,6 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
 
         # ___________________________ SUBFUNCTIONS _______________________________
-        # Function to remove outliers using the Z-score method for each group
-        def remove_outliers(group,metric):
-            threshold = 10 # Z-score threshold, you can adjust this based on your data
-            mean_firing_freq = np.mean(group[metric])
-            std_firing_freq = np.std(group[metric])
-            return group[abs(group[metric] - mean_firing_freq) < threshold * std_firing_freq]
-
         def unpairedTTest(avgdata,measured_metric):
             hAPP = avgdata[avgdata['strain']=='hAPPKI']
             B6J = avgdata[avgdata['strain']=='B6']
@@ -332,7 +338,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         metrics = ['membrane_capacitance','membrane_tau','input_resistance','MT-holding','RMP']
 
         for metric in metrics:
-            cleaned_df = alldata.groupby('strain').apply(lambda x: remove_outliers(x, metric)).reset_index(drop=True)
+            cleaned_df = alldata.groupby('strain').apply(lambda x: removeOutliers(x, metric)).reset_index(drop=True)
 
         # Print the DataFrame containing outliers
         outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
@@ -421,6 +427,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
         alldata = alldata.loc[(alldata['region'] == brain_region) & (alldata['cell_type'] == cell_type)]
         alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
+        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['pApF'] == selected_pApF)]
 
 
         # ___________________________ SUBFUNCTIONS _______________________________
@@ -443,30 +450,21 @@ def generateRegionFigs(save_path,brain_region,cell_type):
 
             return
         
-        # Function to remove outliers using the Z-score method for each group
-        def remove_outliers(group,metric):
-            threshold = 10  # Z-score threshold, you can adjust this based on your data
-            mean_firing_freq = np.mean(group[metric])
-            std_firing_freq = np.std(group[metric])
-            return group[abs(group[metric] - mean_firing_freq) < threshold * std_firing_freq]
-
         # ________________________________________________________________________
-
-        alldata = pd.read_csv(join(csv_path,'compiled_spike_params-FPC.csv'))
 
         if filter_layers:
             alldata = alldata[alldata[distvar] > threshold]
 
-        alldata = alldata.loc[(alldata['APnum'] == 0) & (alldata['pApF'] == selected_pApF) & (alldata['cell_type'] == cell_type)& (alldata['region'] == brain_region)]
 
         metrics = ['AHP','threshold','dVdt max','AP peak','AP hwdt']
 
         for metric in metrics:
             # Removing outliers from the 'pApF' column for each current injection group
-            cleaned_df = alldata.groupby('strain').apply(lambda x: remove_outliers(x, metric)).reset_index(drop=True)
+            cleaned_df = alldata.groupby('strain').apply(lambda x: removeOutliers(x, metric)).reset_index(drop=True)
 
         # Print the DataFrame containing outliers
         outliers_df = alldata[~alldata.index.isin(cleaned_df.index)]
+        print("Outliers spike:",len(outliers_df))
         
         PROPS = setProps('black')
         fig, axs = plt.subplots(ncols=5)#,nrows=2)
@@ -520,13 +518,16 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
 
 
-        # Removing outliers from the 'pApF' column for each current injection group
-        cleaned_df = alldata#.groupby('APnum').apply(remove_outliers).reset_index(drop=True)
-        
+        # Removing outliers from the 'APnum' column for each current injection group
+        cleaned_df = alldata.groupby(['APnum','strain']).apply(lambda x: removeOutliersPeak(x, 'AP peak')).reset_index(drop=True)
+
         xaxisstr = 'APnum' # independent variable, with strain too
         yaxisstr = 'AP peak' # dependent variable
+        if cell_type == 'pyramidal':
+            xlimit = 14
+        elif cell_type == 'interneuron':
+            xlimit = 30
 
-        xlimit = 30
         selectdata = cleaned_df.loc[(cleaned_df[xaxisstr] <= xlimit) & (cleaned_df[xaxisstr] >=0) & (cleaned_df['pApF'] == selected_pApF)]
         hAPPdata = selectdata.loc[(selectdata['strain'] == 'hAPPKI')]
         B6Jdata = selectdata.loc[(selectdata['strain'] == 'B6')]
@@ -571,8 +572,12 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         
         positions1 = np.array(mean_values_hAPP) + np.array(sem_values_hAPP)
         positions2 = np.array(mean_values_B6J) + np.array(sem_values_B6J)
-        positions = np.maximum(positions1,positions2)
 
+        if len(positions1) > len(positions2):
+            positions2 = np.append(positions2,np.zeros((len(positions1) - len(positions2))))
+        elif len(positions1) < len(positions2):
+            positions1 = np.append(positions1,np.zeros((len(positions2) - len(positions1))))
+        positions = np.maximum(positions1,positions2)
 
         for i, label in enumerate(p_list):
             plt.annotate(label,(current_injection_values_hAPP[i],positions[i]),xytext=(0,5),textcoords="offset points", ha='center')

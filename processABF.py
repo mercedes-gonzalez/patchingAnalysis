@@ -336,7 +336,6 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         df.to_csv(join(save_path,'compiled_spike_params-FPC.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
-        df.insert(5,"pApF",round(df["calculated_pApF"]/2)*2)
         df.to_csv(join(save_path,'compiled_firing_freq-FPC.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
@@ -351,7 +350,6 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
         df.to_csv(join(save_path,'compiled_spike_params-FPU.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,firing_csv_list),ignore_index=True)
-        df.insert(5,"pApF",round(df["calculated_pApF"]/2)*2)
         df.to_csv(join(save_path,'compiled_firing_freq-FPU.csv'),index=False)
 
         df = pd.concat(map(pd.read_csv,pas_csv_list),ignore_index=True)
