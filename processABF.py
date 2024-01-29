@@ -154,7 +154,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             all_pas_params = pa.calc_pas_params(myData,img_filename,base_fn) # calculates passive properties of the cell
             rmp = all_pas_params[2,3]
 
-            save_pas_params_df = pd.DataFrame(all_pas_params,columns = ['membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'fit_err'])
+            save_pas_params_df = pd.DataFrame(all_pas_params,columns = ['membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'holding_current','fit_err'])
             save_pas_params_df.insert(1,"MT-Cm",membrane_capacitance)
             save_pas_params_df.insert(1,"MT-Ra",access_resistance)
             save_pas_params_df.insert(1,"MT-holding",holding_current)
@@ -243,7 +243,7 @@ def analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True):
             all_pas_params = pa.calc_pas_params(myData,img_filename,base_fn) # calculates passive properties of the cell
             # membrane_capacitance = all_pas_params[2,2]
 
-            save_pas_params_df = pd.DataFrame(all_pas_params,columns = ['membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'fit_err'])
+            save_pas_params_df = pd.DataFrame(all_pas_params,columns = ['membrane_tau', 'input_resistance', 'membrane_capacitance', 'RMP', 'holding_current', 'fit_err'])
             save_pas_params_df.insert(1,"MT-Cm",membrane_capacitance)
             save_pas_params_df.insert(1,"MT-Ra",membrane_resistance)
             save_pas_params_df.insert(1,"MT-holding",holding_current)

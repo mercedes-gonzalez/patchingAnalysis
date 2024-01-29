@@ -47,8 +47,6 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         mean_firing_freq = np.mean(group[metric])
         std_firing_freq = np.std(group[metric])
         return group[abs(group[metric] - mean_firing_freq) < zthreshold * std_firing_freq]
-    
-
 
     # plot formatting
     sns.set_theme(style="whitegrid")
@@ -61,20 +59,21 @@ def generateRegionFigs(save_path,brain_region,cell_type):
             'capprops':{'color':color}
             }
         return PROPS
-    
-    distvar = 'Y'
-    threshold = 20000
-    selected_pApF = 10
+
+    selected_pApF = 12
     RMPmin = -100
     RMPmax = 100
-    zthreshold = 3 # Z-score threshold, you can adjust this based on your data
+    zthreshold = 6 # Z-score threshold
 
     csv_path = save_path
     filter_layers = 0
     if filter_layers:
-        filter_string = '-Y2000'
+        distvar = 'X'
+        threshold = 600
+        greaterthan = 0 # if 0, it's less than 
+        filter_string = distvar+str(threshold)
     else: 
-        filter_string = '-all'
+        filter_string = 'all'
 
     if 1: # run this to plot current vs firing freq
         alldata = pd.read_csv(join(csv_path,'compiled_firing_freq-FPC.csv'))
@@ -82,7 +81,10 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         alldata = alldata.loc[(alldata['RMP'] < RMPmax) & (alldata['RMP'] > RMPmin)]
 
         if filter_layers:
-            alldata = alldata[alldata[distvar] > threshold]
+            if greaterthan == 1:
+                alldata = alldata[alldata[distvar] > threshold]
+            if greaterthan == 0:
+                alldata = alldata[alldata[distvar] < threshold]
 
         # Removing outliers from the 'pApF' column for each current injection group
         cleaned_df = alldata.groupby('est_pApF').apply(lambda x: removeOutliers(x, 'mean_firing_frequency')).reset_index(drop=True)
@@ -189,7 +191,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
                             vmax=colormax,
                             cmap=colormap)
             plt.title("hAPP " +brain_region)
-            plt.xlabel("Current Injection (pApF)")
+            plt.xlabel("Current Injection (pA/pF)")
             plt.ylabel("Mean firing frequency (Hz)")
             plt.ylim([0,250])
             plt.colorbar(label=distvar)
@@ -203,7 +205,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
                             vmax=colormax,
                             cmap=colormap)
             plt.title("B6J "+brain_region)
-            plt.xlabel("Current Injection (pApF)")
+            plt.xlabel("Current Injection (pA/pF)")
             plt.ylabel("Mean firing frequency (Hz)")
             plt.ylim([0,250])
             plt.colorbar(label=distvar)
@@ -215,8 +217,8 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         
         lw = 2
         ms = 5
-        plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
-        plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white')
+        plt.errorbar(current_injection_values_hAPP, mean_values_hAPP, yerr=sem_values_hAPP, color='royalblue',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white',label='hAPP')
+        plt.errorbar(current_injection_values_B6J, mean_values_B6J, yerr=sem_values_B6J, color='k',fmt='o', markeredgewidth=lw,linewidth=lw,capsize=5,markersize=ms,markerfacecolor='white',label='B6')
         
         positions1 = np.array(mean_values_hAPP) + np.array(sem_values_hAPP)
         positions2 = np.array(mean_values_B6J) + np.array(sem_values_B6J)
@@ -231,7 +233,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         for i, label in enumerate(p_list):
             plt.annotate(label,(unique_pApF_values[i],positions[i]),xytext=(0,10),textcoords="offset points", ha='center')
         
-        plt.xlabel('Current Injection (pApF)')
+        plt.xlabel('Current Injection (pA/pF)')
         plt.ylabel('Mean Firing Frequency (Hz)')
 
         if brain_region == 'interneuron':
@@ -240,14 +242,14 @@ def generateRegionFigs(save_path,brain_region,cell_type):
             plt.ylim([0,100])
 
         plt.xlim([0,max_papf+2])
-        plt.legend(['hAPP','B6J'])
+        plt.legend()
 
         try:
             plt.title(brain_region + ': hAPP ('+ str(hAPPdata.groupby(xaxisstr)['mean_firing_frequency'].size()[0]) +'), B6 (' + str(B6Jdata.groupby(xaxisstr)['mean_firing_frequency'].size()[0]) +')')
         except:
             print('no title')
         plt.tight_layout()
-        plt.savefig(join(save_path,'svgs',brain_region+cell_type+'firing.svg'),dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region+'-'+filter_string+'-'+cell_type+'-firing.svg'),dpi=300,format='svg')
         plt.clf()
 
         if 0:
@@ -324,7 +326,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
 
             pairs = [('B6','hAPPKI')]
             hue_plot_params = {'data': avgdata, 'x': 'strain','y': metric,}
-            annotator = Annotator(axs[axis_num], pairs, **hue_plot_params)
+            annotator = Annotator(axs[axis_num], pairs, **hue_plot_params,verbose=False)
             formatted_pvalues = [f'p={pvalue:.2g}' for pvalue in pvalues]
             annotator.set_custom_annotations(formatted_pvalues)
             annotator.annotate()
@@ -333,7 +335,10 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         # ________________________________________________________________________
 
         if filter_layers:
-            alldata = alldata[alldata[distvar] > threshold]
+            if greaterthan == 1:
+                alldata = alldata[alldata[distvar] > threshold]
+            if greaterthan == 0:
+                alldata = alldata[alldata[distvar] < threshold]
 
         metrics = ['membrane_capacitance','membrane_tau','input_resistance','MT-holding','RMP']
 
@@ -365,7 +370,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
             input_resistance = np.nanmedian(in_rest_list)
 
             rmp_list = np.array(pd.unique(fn_df['RMP']))
-            rmp = np.nanmean(rmp_list)
+            rmp = rmp_list[0]
 
             holding_list = np.array(pd.unique(fn_df['MT-holding']))
             holding = np.nanmedian(holding_list)
@@ -420,7 +425,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
 
         plt.suptitle(brain_region + ': hAPP ('+ str(len(avgdata[avgdata['strain']=='hAPPKI'])) +'), B6 (' + str(len(avgdata[avgdata['strain']=='B6'])) +')')
         plt.tight_layout()
-        plt.savefig(join(save_path,'svgs',brain_region + filter_string + cell_type + '-pas.svg'),dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region + '-'+ filter_string +'-'+cell_type + '-pas.svg'),dpi=300,format='svg')
         plt.clf()
 
     if 1: # plot a boxplot for a spike params
@@ -432,6 +437,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
 
         # ___________________________ SUBFUNCTIONS _______________________________
         def makeBoxplotSpikeParams(metric,metric_str,data,axis_num,pvalues):
+            data = data.sort_values("strain")
             sns.boxplot(y=metric,x="strain",data=data,**PROPS,width=w,ax=axs[axis_num], order = plot_order)
             sns.swarmplot(y=metric,x="strain",hue=huestr,data=data,zorder=.5,ax=axs[axis_num],palette=palstr,size=ms, order = plot_order)
             axs[axis_num].set(ylabel=metric_str,xlabel="")
@@ -443,7 +449,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
 
             pairs = [('B6','hAPPKI')]
             hue_plot_params = {'data': data, 'x': 'strain','y': metric,}
-            annotator = Annotator(axs[axis_num], pairs, **hue_plot_params)
+            annotator = Annotator(axs[axis_num], pairs, **hue_plot_params,verbose=False)
             formatted_pvalues = [f'p={pvalue:.2g}' for pvalue in pvalues]
             annotator.set_custom_annotations(formatted_pvalues)
             annotator.annotate()
@@ -453,7 +459,10 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         # ________________________________________________________________________
 
         if filter_layers:
-            alldata = alldata[alldata[distvar] > threshold]
+            if greaterthan == 1:
+                alldata = alldata[alldata[distvar] > threshold]
+            if greaterthan == 0:
+                alldata = alldata[alldata[distvar] < threshold]
 
 
         metrics = ['AHP','threshold','dVdt max','AP peak','AP hwdt']
@@ -503,7 +512,7 @@ def generateRegionFigs(save_path,brain_region,cell_type):
 
         plt.suptitle(brain_region + ': hAPP ('+ str(len(cleaned_df[cleaned_df['strain']=='hAPPKI'])) +'), B6 (' + str(len(cleaned_df[cleaned_df['strain']=='B6'])) +')')
         plt.tight_layout()
-        plt.savefig(join(save_path,'svgs',brain_region+filter_string+cell_type+'-spike.svg'),dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region+'-'+filter_string+'-'+cell_type+'-spike.svg'),dpi=300,format='svg')
         plt.clf()
 
         with open(join(save_path,"stats","spike_stats_"+brain_region+filter_string+cell_type+".csv"), "w") as f:
@@ -591,5 +600,5 @@ def generateRegionFigs(save_path,brain_region,cell_type):
         plt.legend()
 
         plt.tight_layout()
-        plt.savefig(join(save_path,'svgs',brain_region+'-'+cell_type+'-APpeak.svg'),dpi=300,format='svg')
+        plt.savefig(join(save_path,'svgs',brain_region+'-'+filter_string+'-'+cell_type+'-APpeak.svg'),dpi=300,format='svg')
         plt.clf()

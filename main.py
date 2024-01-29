@@ -29,16 +29,16 @@ plt.rcParams.update({'font.size':10})
 
 start = time.time()
 # define file paths for grabbing and saving data
-abf_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/'
+abf_path = '/Users/mercedesgonzalez/ Dropbox (GaTech)/Research/hAPP AD Project/Data/'
 save_path = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Figs/Spring 2024/'
 main_filename = '/Users/mercedesgonzalez/Dropbox (GaTech)/Research/hAPP AD Project/Data/main/main27.xlsx'
 
 # reads .xlsx file with WC info and makes lists instead of jus t reading all .abfs in a folder.
 # then returns csvs for each file with passive params, firing params, and spike params
-# pABF.analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True)
+pABF.analyzeAllProtocols(main_filename,abf_path,save_path,brainslice=True)
 
 # reads the csvs generated above and creates figures
-gfig.makePatchStatsFigs(save_path)
+# gfig.makePatchStatsFigs(save_path)
 
 end = time.time()
 print("Total time: ",end-start)

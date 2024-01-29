@@ -32,7 +32,7 @@ def monoExp(x, m, t, b):
 def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn is the name of the abf
     # initialize the array to save all the parameters
     n_sweeps = d.numSweeps
-    n_params = 5
+    n_params = 6
     all_data = np.empty((n_sweeps, n_params))
 
     # for each sweep in the abf, find the passive properties and save to the array 
@@ -121,7 +121,7 @@ def calc_pas_params(d,filename,base_fn): # filename is the image path, base_fn i
                 # plt.show()
             plt.clf()
 
-        all_data[sweep,:] = [membrane_tau, input_resistance, membrane_capacitance, resting, fit_err]
+        all_data[sweep,:] = [membrane_tau, input_resistance, membrane_capacitance, resting, holding,fit_err]
     return all_data 
 
 def running_mean(x, N):                                                     #running mean to avoid measuring noise
@@ -570,16 +570,6 @@ def calc_all_spike_params(d,filename,save_path,sshcr,extension,correction):
 
         for p,peak in enumerate(peaks):
             peak_mv = response[stim_start + peak] # off by a little bit because of smoothing
-            if peak_mv > 100:
-                print("\tFilename: ",filename)
-                print("\tSweep: ",sweep)
-                print("\tAP num: ",p)
-                plt.figure()
-                plt.plot(d.time,response)
-                plt.scatter(d.time[stim_start+peak],peak_mv)
-                plt.show()
-                plt.clf()
-            
             try:
                 window = .003 # this *2 = well outside the limits of the AP
                 st1 = int(stim_start + peak - (window / dt))
